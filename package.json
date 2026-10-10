@@ -1,0 +1,12 @@
+{
+  "name": "goodnight-uestc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable, deterministic UESTC daily reporting with saved-record verification",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "bin": { "goodnight": "bin/goodnight.mjs" },
+  "scripts": { "test": "node --test", "start": "node bin/goodnight.mjs", "doctor": "node bin/goodnight.mjs doctor" },
+  "dependencies": { "playwright": "1.62.1" }
+}

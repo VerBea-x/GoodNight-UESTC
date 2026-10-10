@@ -1,0 +1,37 @@
+# Architecture
+
+## Runtime flow
+
+GoodNight is a deterministic Node.js command-line program backed by Playwright. The current adapter targets one service: UESTC's “Good Night Chengdian” portal. The runtime should fail closed whenever a required page element, option, or location function cannot be identified.
+
+The daily operation flow is:
+
+1. Load per-user configuration and the authenticated current-day record and server schedule.
+2. Obtain real location through the frontend API with GCJ-02 requested; reject unknown or over-limit accuracy (default 200 m).
+3. During the check-in server window, try check-in using available valid dormitory geofences.
+4. If no valid dormitory geofence is available or check-in is definitively rejected, fetch a fresh record using the current authenticated session. Fall back to report only if it remains `PENDING` and actual location permits that report type. The default `OUTSIDE` type is valid only for an actually outside-campus location.
+5. Read the saved record. For check-in verify the date and `CHECKED_IN` status; for a report verify date, `STUDENT_REPORTED`, location type, category, and configured text.
+
+`run --dry-run` performs preflight, including actual location, but does not issue either the check-in or report POST. `check` reads the current day's saved school record. A missing or mismatching saved record is not success.
+
+## Reliability and scheduling
+
+An exclusive lock prevents concurrent local runs. Separate durable journals record check-in and report POST attempts by date before sending each POST. A timeout or other ambiguous check-in outcome blocks report fallback; the system must not infer rejection from a missing response. If a crash or timeout leaves an uncertain outcome, the operator should use `check` before taking further action.
+
+The daemon uses `Asia/Shanghai` for the report schedule regardless of host timezone. It maintains the browser session every 10 minutes and permits a 30-minute catch-up interval after the configured daily time. Service installation does not itself trigger an immediate report outside the normal window.
+
+## Local data and trust boundaries
+
+Configuration and browser state live in the OS-specific user data directory, outside the checkout. They can be redirected using `GOODNIGHT_HOME` or `--data-dir`. Authentication happens in the user's browser profile; cookies or storage state must not be exported into logs or source control. Periodic client activity does not establish the school's server-side session lifetime.
+
+Location first uses the live `uni.getLocation` function. If unavailable, it dynamically imports the discovered same-origin `/assets/index-*` module and looks up the configured `frontendLocationExport` name (example default `bk`). This is a narrow fallback for the observed frontend integration. If neither path exists, stop with an error rather than try guessed aliases, infer coordinates, or use an LLM repair. Location accuracy must be known and at or better than `maxAccuracyMeters` (default 200 m). Operators may change the threshold only to match a genuine location provider's real accuracy, never to force acceptance of fixed or fabricated coordinates.
+
+The default report reason is `在校外旅游会注意自己安全，导员放心`, with keyword `旅游` (combined with the `OUTSIDE` location type). Blank input during initialization selects this default. Custom reasons use the frontend-style 10–200 UTF-16 code-unit limit. The app must not submit the default `OUTSIDE` report for a location classified on campus.
+
+## Extension boundary
+
+The current code supports the UESTC flow only. Supporting another school requires a separately designed adapter for its options, authentication, location, submission, and saved-record verification. The existence of this CLI does not imply compatibility with another institution.
+
+## Validation boundary
+
+The historical macOS validation and the portable package have different evidence. Original automation completed a report with authenticated Chrome on 2026-10-10 and later read the saved statuses/content. The new repository has not yet completed a school E2E run. CI runs offline synthetic tests, including service-definition generator tests; it does not validate a live service installation, school access, GPS, or authentication on any operating system.

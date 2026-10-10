@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "remark": "",
+  "keyword": "旅游",
+  "locationType": "OUTSIDE",
+  "reportTime": "22:30",
+  "sessionIntervalMinutes": 10,
+  "catchUpMinutes": 30,
+  "browserChannel": "chrome",
+  "headless": true,
+  "frontendLocationExport": "bk",
+  "maxAccuracyMeters": 200
+}

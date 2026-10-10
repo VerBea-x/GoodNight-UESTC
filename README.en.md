@@ -1,0 +1,63 @@
+# GoodNight
+
+GoodNight is a local, deterministic tool for UESTC's “Good Night Chengdian” portal. It uses Node.js and Playwright to inspect today's record and service window, then tries check-in first using real GCJ-02 location and an available valid dormitory geofence. It may fall back to a report only under the rules below. The daily flow does not use an LLM.
+
+## Status
+
+The original macOS automation completed a report in authenticated Chrome at 22:30 on 2026-10-10. A later read found that day's `STUDENT_REPORTED` and `INSTRUCTOR_REPORTED` states and matching content. This validates the original macOS flow only. The new portable repository has not yet passed a school end-to-end test. Windows and Linux location and authentication are unverified. CI runs offline synthetic tests only.
+
+This tool sends a real check-in or report to the school. Review the configuration and `run --dry-run` output. Make sure the action reflects your circumstances and follows school requirements. Only the current UESTC flow is implemented; other schools are not automatically supported.
+
+## Requirements and quick start
+
+- Node.js 22 or later and npm
+- macOS, Windows, or Linux
+- Installed Chrome is recommended. You complete login, OAuth, or CAPTCHA yourself in a visible browser window.
+- Location requires a real OS/browser location provider and a location suitable for the intended action.
+
+```sh
+git clone https://github.com/beichenO2/GoodNight.git
+cd GoodNight
+npm ci
+node bin/goodnight.mjs init
+node bin/goodnight.mjs login
+node bin/goodnight.mjs doctor
+node bin/goodnight.mjs check
+node bin/goodnight.mjs run --dry-run
+```
+
+`init` collects a 10–200 UTF-16 code-unit remark, keyword (default `旅游`, combined with the `OUTSIDE` location type), daily time (default `22:30`), and browser. The default remark is `在校外旅游会注意自己安全，导员放心`; press Enter to use it, or omit `--remark` in non-interactive mode. Custom remarks must meet the same length limit. Options include `--remark`, `--keyword`, `--time`, and `--browser`.
+
+`login` opens GoodNight's isolated browser profile. In that window, complete unified authentication and click “晚安成电”; then return to the terminal and press Enter for an online business-authentication check. Logging in through your ordinary browser does not transfer the session to this isolated profile. `doctor` performs local checks by default; add `--online` to check online authentication. `check` reads today's record without submitting. `run --dry-run` checks the time window, real location, and form without sending either POST.
+
+`run` tries check-in during the school's check-in window using real GCJ-02 location and an available valid dormitory geofence. If no valid dormitory geofence is available, or check-in is definitively rejected, it reads today's record again using the current authenticated session. It may fall back to reporting only if that fresh record remains `PENDING` and the actual location is suitable for reporting. The default `OUTSIDE` report applies only when the actual location is classified outside campus; campus location is never mislabeled as outside. An ambiguous check-in POST or timeout never triggers blind report fallback. Separate durable per-date journals are written before each operation's POST. If an outcome is unclear, run `check` first.
+
+Browser choices are `chrome` (default), `msedge`, and `chromium`. Prefer installed Chrome or Edge. To use Playwright Chromium, run `npx playwright install chromium` and initialize with `--browser chromium`. Installing Chromium does not provide real campus location. Location first uses `uni.getLocation`; if unavailable, it loads the current same-origin frontend module and looks up the configured `frontendLocationExport`. It stops if neither path works and does not guess another export name.
+
+## Daemon and service
+
+```sh
+node bin/goodnight.mjs daemon
+node bin/goodnight.mjs status
+node bin/goodnight.mjs service install
+node bin/goodnight.mjs service remove
+```
+
+The daemon maintains the session every 10 minutes and reports at the configured daily time, with a 30-minute catch-up window. Pre-submit failures retry every two minutes within that window; uncertain POST outcomes stop automatic retries. Installing the service does not immediately submit outside that window. It runs as the current user; keep the machine on and connected with the user session available. The service refers to the absolute checkout and Node paths used at installation; reinstall it after moving the checkout. `service install --write-only` writes the service definition without enabling it.
+
+## Private data and recovery
+
+Config, browser profile, authentication state, logs, and runtime state live outside the repository. Defaults are macOS `~/Library/Application Support/GoodNight`, Windows `%LOCALAPPDATA%\GoodNight`, and Linux `$XDG_STATE_HOME/goodnight` or `~/.local/state/goodnight`. Override with `GOODNIGHT_HOME` or `--data-dir PATH`. Do not commit private data or copy a browser profile across OSes or accounts; log in again on the new machine.
+
+The server-side session lifetime is unknown. Periodic client access only extends client-side retention. Treat `need_login` as a failure and log in again.
+
+An exclusive lock and separate durable per-date check-in and report journals prevent blind repeats after a crash or timeout. The `frontendLocationExport` setting (default `bk`) names the frontend location function. If the configured export is missing, fail closed rather than guess or use an LLM repair. `maxAccuracyMeters` defaults to 200 m; unknown or less precise readings stop the operation. Adjust it only for the genuine provider's actual accuracy, never to use a fixed location.
+
+## Development
+
+```sh
+npm ci
+npm test
+```
+
+CI runs offline tests on Node.js 22/24 and Ubuntu, macOS, and Windows, including synthetic tests for service-definition generators. These test candidate migration code; they do not establish that services were installed on those operating systems or that school E2E, GPS, or authentication works there. See [architecture](docs/architecture.md), [portability](docs/portability.md), and the [source audit](docs/source-audit.md).
