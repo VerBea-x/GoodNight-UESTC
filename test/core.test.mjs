@@ -8,7 +8,9 @@ import { Store } from '../src/store.mjs';
 import { runDaily, runWithRetries } from '../src/runner.mjs';
 import { BusinessError } from '../src/adapters/uestc.mjs';
 import { reportWindow, checkinWindow, geometryContains, locationType, findDorm } from '../src/policy.mjs';
-import { dueReport, tick } from '../src/daemon.mjs';
+import { dueReport, tick as tickActual } from '../src/daemon.mjs';
+import { inspect } from '../src/runner.mjs';
+const tick=options=>tickActual({...options,notify:async()=>{}});
 
 const DATE='2026-10-10', NOW=new Date(`${DATE}T22:30:00+08:00`);
 const ok=data=>({code:0,ok:true,data});
@@ -147,7 +149,7 @@ test('scheduler uses Shanghai time, catch-up, daily marker, deferred windows and
   assert.equal(dueReport(DEFAULTS,{},NOW),true);
   assert.equal(dueReport(DEFAULTS,{},new Date(`${DATE}T23:00:00+08:00`)),false);
   let reportCalls=0;
-  const report=async()=>{reportCalls++;return reportCalls===1?{result:'window_not_open',businessDate:DATE,nextAttemptAt:`${DATE}T15:30:00Z`}:{result:'success'};};
+  const report=async()=>{reportCalls++;return reportCalls===1?{result:'window_not_open',businessDate:DATE,nextAttemptAt:`${DATE}T15:30:00Z`}:{result:'success',businessDate:DATE};};
   assert.equal((await tick({config:DEFAULTS,store,now:NOW,report})).action,'report');
   assert.equal(dueReport(DEFAULTS,store.read('scheduler.json'),new Date(`${DATE}T23:29:00+08:00`)),false);
   assert.equal((await tick({config:DEFAULTS,store,now:new Date(`${DATE}T23:30:00+08:00`),report})).result.result,'success');
@@ -158,7 +160,7 @@ test('scheduler uses Shanghai time, catch-up, daily marker, deferred windows and
 });
 test('scheduler retries a pre-POST transient failure within the bounded catch-up interval',async t=>{
   const {store}=setup(t);let calls=0;
-  const report=async()=>++calls===1?{result:'location_fail',submitted:false}:{result:'success',submitted:true};
+  const report=async()=>++calls===1?{result:'location_fail',submitted:false}:{result:'success',businessDate:DATE,submitted:true};
   await tick({config:DEFAULTS,store,now:NOW,report});assert.equal(store.read('scheduler.json').lastReportDate,undefined);
   await tick({config:DEFAULTS,store,now:new Date(`${DATE}T22:32:00+08:00`),report});assert.equal(calls,2);assert.equal(store.read('scheduler.json').lastReportDate,DATE);
 });
@@ -169,12 +171,58 @@ test('scheduler never retries ambiguous submitted outcomes',async t=>{
   await tick({config:DEFAULTS,store,now:new Date(`${DATE}T22:32:00+08:00`),report,session:async()=>({result:'session_valid'})});
   assert.equal(calls,1);
 });
-test('sleep or restart past the retry deadline does not resume a daily attempt',async t=>{
+test('sleep past the hard cutoff cannot resume a daily attempt',async t=>{
   const {store}=setup(t);let calls=0;
   const report=async()=>{calls++;return {result:'location_fail',submitted:false};};
   await tick({config:DEFAULTS,store,now:NOW,report});
-  await tick({config:DEFAULTS,store,now:new Date(`${DATE}T23:30:00+08:00`),report,session:async()=>({result:'session_valid'})});
+  await tick({config:DEFAULTS,store,now:new Date(`${DATE}T23:56:00+08:00`),report,session:async()=>({result:'session_valid'})});
   assert.equal(calls,1);
+});
+test('missed normal trigger is recovered before cutoff, completion prevents later backup',async t=>{
+  const {store}=setup(t);let calls=0;
+  const report=async()=>{calls++;return {result:'success',businessDate:DATE,submitted:true};};
+  const out=await tick({config:DEFAULTS,store,now:new Date(`${DATE}T23:40:00+08:00`),report});
+  assert.equal(out.action,'recovery');assert.equal(calls,1);
+  await tick({config:DEFAULTS,store,now:new Date(`${DATE}T23:50:00+08:00`),report,session:async()=>({result:'session_valid'})});assert.equal(calls,1);
+});
+test('expired normal retries leave a ten-minute watchdog backup channel',async t=>{
+  const {store}=setup(t);let calls=0;
+  const report=async()=>++calls===1?{result:'location_fail',submitted:false}:{result:'already_done',businessDate:DATE};
+  await tick({config:DEFAULTS,store,now:NOW,report});
+  assert.equal((await tick({config:DEFAULTS,store,now:new Date(`${DATE}T23:10:00+08:00`),report})).action,'recovery');assert.equal(calls,2);
+});
+test('watchdog reads persisted unknown report instead of issuing a second POST',async t=>{
+  const f=setup(t,{submit:async body=>{f.calls.push(['report',body]);throw new BusinessError('transport_error');}});
+  await runDaily(f.options);
+  const out=await tick({config:DEFAULTS,store:f.store,now:new Date(`${DATE}T23:10:00+08:00`),report:()=>runWithRetries(f.options)});
+  assert.equal(out.result.result,'unknown');assert.equal(posts(f.calls).length,1);
+});
+test('preflight checks actual location without any POST, once during the early interval',async t=>{
+  const f=setup(t);let calls=0;
+  const preflight=async()=>{calls++;return inspect({...f.options,mode:'preflight'});};
+  assert.equal((await tick({config:DEFAULTS,store:f.store,now:new Date(`${DATE}T22:10:00+08:00`),preflight})).result.result,'preflight_ready');
+  await tick({config:DEFAULTS,store:f.store,now:new Date(`${DATE}T22:20:00+08:00`),preflight,session:async()=>({result:'session_valid'})});
+  assert.equal(calls,1);assert.equal(posts(f.calls).length,0);
+});
+test('stale completed business date does not clear current-day failure',async t=>{
+  const {store}=setup(t);
+  await tick({config:DEFAULTS,store,now:NOW,report:async()=>({result:'unknown',submitted:true})});
+  const out=await tick({config:DEFAULTS,store,now:new Date(`${DATE}T23:10:00+08:00`),report:async()=>({result:'already_done',businessDate:'2026-10-09'})});
+  assert.equal(out.result.result,'unknown');assert.equal(store.read('scheduler.json').completionDate,undefined);
+  assert.notEqual(store.read('failure-'+DATE+'.json').result,'resolved');
+});
+test('long configured catch-up cannot bypass the hard cutoff',async t=>{
+  const {store}=setup(t);const config=validateConfig({...DEFAULTS,catchUpMinutes:120});let calls=0;
+  const now=new Date(`${DATE}T23:56:00+08:00`);
+  assert.equal(dueReport(config,{},now),false);
+  await tick({config,store,now,report:async()=>{calls++;return {result:'unknown'};},session:async()=>({result:'session_valid'})});
+  assert.equal(calls,0);
+});
+test('configured cutoff is rechecked after slow location, before any POST',async t=>{
+  const f=setup(t);let clock=new Date(`${DATE}T22:59:00+08:00`);
+  f.adapter.getLocation=async()=>{clock=new Date(`${DATE}T23:01:00+08:00`);return geo;};
+  const out=await runDaily({...f.options,config:{...DEFAULTS,recoveryCutoff:'23:00'},now:()=>clock});
+  assert.equal(out.result,'window_missed');assert.equal(out.reason,'recovery_cutoff_reached');assert.equal(posts(f.calls).length,0);
 });
 test('before both windows the earliest check-in start is selected',async t=>{
   const f=setup(t,{getSchedule:async()=>ok({...schedule().data,studentSubmissionStartOffsetMinute:1380,studentSubmissionEndOffsetMinute:1410})});

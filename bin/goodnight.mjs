@@ -21,7 +21,7 @@ const HELP = `GoodNight — 晚安成电自动填报（纯脚本，不调用 LLM
  check                 只读查询今日记录，不提交
  run [--dry-run]       优先打卡，无法打卡再填报；dry-run不提交
  daemon                上海时间常驻调度（每天填报、周期会话检查）
- status                显示本地最近结果及会话状态
+ status                显示最近结果、预检、失败记录及会话状态
  service install       安装当前用户的系统服务
  service remove        卸载服务，保留配置/登录数据
  service install --write-only  只生成文件，不装载服务
@@ -83,7 +83,7 @@ async function main() {
   if(dataDir===path.parse(dataDir).root)throw new Error('数据目录不能是文件系统根目录');
   const store=new Store(dataDir);
   if(cmd==='init'){await initialize(store,v);return;}
-  if(cmd==='status'){output({dataDir,lastReport:store.read('last-result.json'),lastSession:store.read('last-session.json'),scheduler:store.read('scheduler.json')});return;}
+  if(cmd==='status'){output({dataDir,lastReport:store.read('last-result.json'),lastSession:store.read('last-session.json'),lastPreflight:store.read('last-preflight.json'),lastFailure:store.read('last-failure.json'),scheduler:store.read('scheduler.json')});return;}
   if(cmd==='service'&&p[1]==='remove') {output(await uninstallService({dataDir,apply:!v['write-only']}));return;}
   if(cmd==='doctor') {
     let config,configError;try{config=loadConfig(dataDir);}catch(e){configError=e.message;}

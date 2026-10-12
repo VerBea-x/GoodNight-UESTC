@@ -16,9 +16,9 @@ The daily operation flow is:
 
 ## Reliability and scheduling
 
-An exclusive lock prevents concurrent local runs. Separate durable journals record check-in and report POST attempts by date before sending each POST. A timeout or other ambiguous check-in outcome blocks report fallback; the system must not infer rejection from a missing response. If a crash or timeout leaves an uncertain outcome, the operator should use `check` before taking further action.
+An exclusive lock prevents concurrent local runs. Separate per-date, per-operation exclusive claim files are synchronously flushed before check-in and report POSTs. A restart or ambiguous POST with a claim present performs GET reconciliation rather than repeating that POST. A timeout or other ambiguous check-in outcome blocks report fallback; the system must not infer rejection from a missing response. If a crash or timeout leaves an uncertain outcome, only a verified saved school record establishes success; use `check` before taking further action. Local flush/rename patterns do not guarantee survival of every power loss or server-side record retention.
 
-The daemon uses `Asia/Shanghai` for the report schedule regardless of host timezone. It maintains the browser session every 10 minutes and permits a 30-minute catch-up interval after the configured daily time. Service installation does not itself trigger an immediate report outside the normal window.
+The daemon uses `Asia/Shanghai` regardless of host timezone and checks scheduling every 30 seconds. Its default 20-minute preflight window is once per day before the configured report time; preflight validates the business session and real location without check-in/report POSTs. The existing 30-minute quick catch-up remains, followed by recovery checks every 10 minutes until the exclusive 23:55 cutoff, subject to server windows. An existing macOS 600-second keeper samples the preflight window at its first tick inside the window, not at an exact 22:10 time. See [`resilience.md`](resilience.md) for failure archives, alert limits, and restart behavior.
 
 ## Local data and trust boundaries
 

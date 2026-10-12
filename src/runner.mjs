@@ -47,6 +47,8 @@ export async function runDaily({ config, store, dryRun=false, now=()=>new Date()
     if(state==='unknown')return {result:'unknown',reason:'today_unavailable_or_date_changed'};
     const date=record.data.businessDate;
     if(state==='done'&&!dryRun)return {result:'already_done',...summary(record)};
+    const pastCutoff=()=>now().getTime()>=Date.parse(`${date}T${config.recoveryCutoff}:00+08:00`);
+    if(pastCutoff())return {result:'window_missed',reason:'recovery_cutoff_reached'};
     const reportJournal=store.read(`submission-report-${date}.json`),checkinJournal=store.read(`submission-checkin-${date}.json`);
     if(reportJournal&&!dryRun)return await reconcile(adapter,date,config,{sleep,emit});
     if(checkinJournal&&checkinJournal.state!=='checkin_rejected'&&!dryRun)return await reconcile(adapter,date,config,{kind:'checkin',sleep,emit});
@@ -73,6 +75,7 @@ export async function runDaily({ config, store, dryRun=false, now=()=>new Date()
       if(current.result==='open') {
         const ua=await adapter.getUserAgent();
         const clientTime=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(now());
+        if(pastCutoff())return {result:'window_missed',reason:'recovery_cutoff_reached'};
         submitted=true;
         const out=await submitAndVerify(adapter,date,config,store,{latitude:geo.latitude,longitude:geo.longitude,reverseGeocode:address,userAgent:ua,clientTime,accuracy:geo.accuracy},'checkin',{sleep,emit});
         // Only an explicit rejection + authenticated, current PENDING record allows report fallback.
@@ -94,6 +97,7 @@ export async function runDaily({ config, store, dryRun=false, now=()=>new Date()
     if(freshState!=='pending')return {result:'unknown',reason:'record_changed',submitted};
     const lastWindow=reportWindow(await adapter.getSchedule(),date,now());
     if(lastWindow.result!=='open')return {...lastWindow,submitted};
+    if(pastCutoff())return {result:'window_missed',reason:'recovery_cutoff_reached',submitted};
     submitted=true;return await submitAndVerify(adapter,date,config,store,body,'report',{sleep,emit});
   }catch(e){return {result:failure(e),reason:e instanceof BusinessError?e.code:'runtime_error',submitted};}
   finally{if(ctx)await ctx.close().catch(()=>{});unlock();}
@@ -113,6 +117,11 @@ export async function inspect({config,store,mode='check',open=launchBrowser,adap
   try {
     ctx=await open(config,store.dir);const adapter=adapterFactory(ctx,config);await adapter.authenticate();
     if(mode==='session')return {result:'session_valid'};
+    if(mode==='preflight') {
+      let geo;try {geo=await adapter.getLocation();}catch(e){return {result:e.code==='need_login'?'need_login':'location_fail',reason:'location_unavailable_or_frontend_changed'};}
+      if(!Number.isFinite(geo?.accuracy)||geo.accuracy<0||geo.accuracy>config.maxAccuracyMeters)return {result:'location_fail',reason:'accuracy_insufficient'};
+      return {result:'preflight_ready',accuracyMeter:Math.round(geo.accuracy)};
+    }
     const r=await adapter.getToday();if(!apiSucceeded(r)||!r.data)return {result:'unknown',reason:'today_unavailable'};
     return {result:'record_read',...summary(r),locationType:r.data.reportedLocationTypeCode,keywordMatches:r.data.caseKeyword===config.keyword,remarkMatches:r.data.caseRemark===config.remark};
   }catch(e){return {result:failure(e),reason:e instanceof BusinessError?e.code:'runtime_error'};}

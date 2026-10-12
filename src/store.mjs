@@ -17,7 +17,7 @@ export class Store {
   }
   write(name, value) {
     const target = this.file(name), temp = target + '.' + crypto.randomUUID() + '.tmp';
-    try { fs.writeFileSync(temp, JSON.stringify(value, null, 2) + '\n', { mode: 0o600, flag: 'wx' }); fs.renameSync(temp, target); }
+    try { fs.writeFileSync(temp, JSON.stringify(value, null, 2) + '\n', { mode: 0o600, flag: 'wx', flush: true }); fs.renameSync(temp, target); }
     finally { try { fs.unlinkSync(temp); } catch {} }
   }
   acquire() {
@@ -39,7 +39,7 @@ export class Store {
   claimSubmission(date, fingerprint, kind = 'report') {
     if (!['report', 'checkin'].includes(kind)) throw new Error('invalid_submission_kind');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('invalid_business_date');
-    try { fs.writeFileSync(this.file(`submission-${kind}-${date}.json`), JSON.stringify({ businessDate: date, fingerprint, kind, state: 'attempted', at: new Date().toISOString() }), { flag: 'wx', mode: 0o600 }); return true; }
+    try { fs.writeFileSync(this.file(`submission-${kind}-${date}.json`), JSON.stringify({ businessDate: date, fingerprint, kind, state: 'attempted', at: new Date().toISOString() }), { flag: 'wx', mode: 0o600, flush: true }); return true; }
     catch (e) { if (e.code === 'EEXIST') return false; throw e; }
   }
   log(event, detail = {}) {

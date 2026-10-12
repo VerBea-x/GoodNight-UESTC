@@ -2,7 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 export const DEFAULT_REASON = '在校外旅游会注意自己安全，导员放心';
-export const DEFAULTS = Object.freeze({ version: 1, remark: DEFAULT_REASON, keyword: '旅游', locationType: 'OUTSIDE', reportTime: '22:30', sessionIntervalMinutes: 10, catchUpMinutes: 30, browserChannel: 'chrome', headless: true, frontendLocationExport: 'auto', maxAccuracyMeters: 200 });
+export const DEFAULTS = Object.freeze({ version: 1, remark: DEFAULT_REASON, keyword: '旅游', locationType: 'OUTSIDE', reportTime: '22:30', sessionIntervalMinutes: 10, catchUpMinutes: 30, browserChannel: 'chrome', headless: true, frontendLocationExport: 'auto', maxAccuracyMeters: 200, preflightLeadMinutes: 20, recoveryIntervalMinutes: 10, recoveryCutoff: '23:55', notifications: true });
 export function defaultDataDir({ platform = process.platform, home = os.homedir(), env = process.env } = {}) {
   const paths=platform==='win32'?path.win32:path.posix;
   if (env.GOODNIGHT_HOME) return paths.resolve(env.GOODNIGHT_HOME);
@@ -22,6 +22,10 @@ export function validateConfig(input) {
   if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(c.reportTime)) throw new Error('时间必须是 HH:mm（上海时间）');
   if (!Number.isInteger(c.sessionIntervalMinutes) || c.sessionIntervalMinutes < 1 || c.sessionIntervalMinutes > 30) throw new Error('会话检查间隔必须为1–30分钟');
   if (!Number.isInteger(c.catchUpMinutes) || c.catchUpMinutes < 1 || c.catchUpMinutes > 120) throw new Error('补执行窗口必须为1–120分钟');
+  if (!Number.isInteger(c.preflightLeadMinutes) || c.preflightLeadMinutes < 1 || c.preflightLeadMinutes > 120) throw new Error('预检提前量必须为1–120分钟');
+  if (!Number.isInteger(c.recoveryIntervalMinutes) || c.recoveryIntervalMinutes < 1 || c.recoveryIntervalMinutes > 30) throw new Error('补执行检查间隔必须为1–30分钟');
+  if (typeof c.recoveryCutoff !== 'string' || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(c.recoveryCutoff) || c.recoveryCutoff > '23:55' || c.recoveryCutoff <= c.reportTime) throw new Error('补执行截止须晚于每日时间且不晚于23:55');
+  if (typeof c.notifications !== 'boolean') throw new Error('notifications 必须是布尔值');
   if (!['chrome', 'msedge', 'chromium'].includes(c.browserChannel)) throw new Error('浏览器必须为 chrome、msedge 或 chromium');
   if (typeof c.headless !== 'boolean') throw new Error('headless 必须是布尔值');
   if (typeof c.frontendLocationExport !== 'string' || !/^[\w$]{1,80}$/.test(c.frontendLocationExport)) throw new Error('定位导出名无效');

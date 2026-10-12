@@ -9,5 +9,9 @@
   "browserChannel": "chrome",
   "headless": true,
   "frontendLocationExport": "auto",
-  "maxAccuracyMeters": 200
+  "maxAccuracyMeters": 200,
+  "preflightLeadMinutes": 20,
+  "recoveryIntervalMinutes": 10,
+  "recoveryCutoff": "23:55",
+  "notifications": true
 }

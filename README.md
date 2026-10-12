@@ -44,7 +44,7 @@ node bin/goodnight.mjs service install
 node bin/goodnight.mjs service remove
 ```
 
-`daemon` 每 10 分钟维护会话，在配置的每日时间运行填报，并在目标时间之后 30 分钟内补跑；提交前临时失败会在此窗口内每两分钟重试，提交结果不明则停止；安装服务不会在非运行窗口立即填报。服务以当前用户运行，机器需保持开机、联网且用户会话可用。`service install --write-only` 只写入服务定义。服务绑定安装时的绝对仓库目录和 Node 路径，移动仓库后请重新安装。
+`daemon` 每 30 秒检查调度：默认在 22:10–22:30 每日执行一次只读认证与真实定位预检，22:30 启动原快速填报流程；快速补跑窗之后，仍可按每 10 分钟一次恢复检查，最晚不超过 23:55（不含），且仍受学校服务时段限制。原 macOS 600 秒 keeper 会在预检窗口内第一次醒来时预检，并非精确 22:10 触发。尚未提交且符合重试条件的临时失败会在原 30 分钟快速窗口内每两分钟重试；提交结果不明时只回读核对，不盲目重复 POST。服务以当前用户运行，机器需保持开机、联网且用户会话可用。`service install --write-only` 只写入服务定义。服务绑定安装时的绝对仓库目录和 Node 路径，移动仓库后请重新安装。daemon 不热加载配置；修改配置后需重启/重新安装服务。失败状态与提醒策略见 [`docs/resilience.md`](docs/resilience.md)。
 
 ## 私有数据
 
@@ -65,4 +65,4 @@ npm ci
 npm test
 ```
 
-CI 在 Node.js 22/24 和 Ubuntu、macOS、Windows 上运行离线测试，包括系统服务定义生成器的合成测试。这些是候选移植路径的代码测试，不表示服务已在对应真实操作系统安装测试，也不证明学校 E2E、GPS 或认证成功。2026-10-12 定位导出事故及后续 macOS 共享定位器验证记录见 [`docs/incidents/2026-10-12-location-export.md`](docs/incidents/2026-10-12-location-export.md)；这些记录不代表新 CLI 已完成学校 E2E。架构和待核验主张见 [`docs/architecture.md`](docs/architecture.md)、[`docs/portability.md`](docs/portability.md)、[`docs/source-audit.md`](docs/source-audit.md)。
+CI 在 Node.js 22/24 和 Ubuntu、macOS、Windows 上运行离线测试，包括系统服务定义生成器的合成测试。这些是候选移植路径的代码测试，不表示服务已在对应真实操作系统安装测试，也不证明学校 E2E、GPS 或认证成功。2026-10-12 定位导出事故及后续 macOS 共享定位器验证记录见 [`docs/incidents/2026-10-12-location-export.md`](docs/incidents/2026-10-12-location-export.md)；这些记录不代表新 CLI 已完成学校 E2E。架构、恢复机制和待核验主张见 [`docs/architecture.md`](docs/architecture.md)、[`docs/portability.md`](docs/portability.md)、[`docs/resilience.md`](docs/resilience.md)、[`docs/source-audit.md`](docs/source-audit.md)。
