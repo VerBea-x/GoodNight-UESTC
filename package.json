@@ -5,8 +5,19 @@
   "description": "Portable, deterministic UESTC daily reporting with saved-record verification",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=22" },
-  "bin": { "goodnight": "bin/goodnight.mjs" },
-  "scripts": { "test": "node --test", "start": "node bin/goodnight.mjs", "doctor": "node bin/goodnight.mjs doctor" },
-  "dependencies": { "playwright": "1.62.1" }
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "goodnight": "bin/goodnight.mjs"
+  },
+  "scripts": {
+    "test": "node --test",
+    "start": "node bin/goodnight.mjs",
+    "doctor": "node bin/goodnight.mjs doctor"
+  },
+  "dependencies": {
+    "acorn": "8.19.0",
+    "playwright": "1.62.1"
+  }
 }

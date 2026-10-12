@@ -1,4 +1,5 @@
 import { apiSucceeded } from '../policy.mjs';
+import { locate } from '../location.mjs';
 export const ORIGIN = 'https://jzsz.uestc.edu.cn';
 export const PORTAL = `${ORIGIN}/#/hall/home`;
 export const PAGE = `${ORIGIN}/daily-checkin-h5/index.html?appId=294#/pages/student/report-today/home/index`;
@@ -35,21 +36,7 @@ export function createUestcAdapter(ctx, config) {
       const page = await ctx.newPage();
       try {
         await page.goto(PAGE, { waitUntil: 'domcontentloaded', timeout: 45000 });
-        return await page.evaluate(async exportName => {
-          let locate = globalThis.uni?.getLocation;
-          if (typeof locate !== 'function') {
-            const src = [...document.querySelectorAll('script[type="module"][src]')].map(x => x.src).find(x => /\/assets\/index-/.test(x));
-            if (!src || new URL(src).origin !== location.origin) throw new Error('frontend_location_api_changed');
-            const module = await import(src); locate = module[exportName];
-          }
-          if (typeof locate !== 'function') throw new Error('frontend_location_api_changed');
-          return new Promise((resolve, reject) => {
-            const timer = setTimeout(() => reject(new Error('location_timeout')), 75000);
-            locate({ type: 'gcj02', isHighAccuracy: true, accuracy: 'best', highAccuracyExpireTime: 60000,
-              success: x => { clearTimeout(timer); resolve({ latitude: x.latitude, longitude: x.longitude, accuracy: x.accuracy }); },
-              fail: () => { clearTimeout(timer); reject(new Error('location_failed')); } });
-          });
-        }, config.frontendLocationExport);
+        return await locate(page);
       } catch { throw new BusinessError('location_unavailable_or_frontend_changed'); }
       finally { await page.close().catch(() => {}); }
     },

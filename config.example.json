@@ -8,6 +8,6 @@
   "catchUpMinutes": 30,
   "browserChannel": "chrome",
   "headless": true,
-  "frontendLocationExport": "bk",
+  "frontendLocationExport": "auto",
   "maxAccuracyMeters": 200
 }

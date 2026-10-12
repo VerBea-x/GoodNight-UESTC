@@ -2,7 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 export const DEFAULT_REASON = '在校外旅游会注意自己安全，导员放心';
-export const DEFAULTS = Object.freeze({ version: 1, remark: DEFAULT_REASON, keyword: '旅游', locationType: 'OUTSIDE', reportTime: '22:30', sessionIntervalMinutes: 10, catchUpMinutes: 30, browserChannel: 'chrome', headless: true, frontendLocationExport: 'bk', maxAccuracyMeters: 200 });
+export const DEFAULTS = Object.freeze({ version: 1, remark: DEFAULT_REASON, keyword: '旅游', locationType: 'OUTSIDE', reportTime: '22:30', sessionIntervalMinutes: 10, catchUpMinutes: 30, browserChannel: 'chrome', headless: true, frontendLocationExport: 'auto', maxAccuracyMeters: 200 });
 export function defaultDataDir({ platform = process.platform, home = os.homedir(), env = process.env } = {}) {
   const paths=platform==='win32'?path.win32:path.posix;
   if (env.GOODNIGHT_HOME) return paths.resolve(env.GOODNIGHT_HOME);

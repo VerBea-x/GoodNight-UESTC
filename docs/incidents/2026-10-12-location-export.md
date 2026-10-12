@@ -1,0 +1,21 @@
+# 2026-10-12 location-export incident
+
+This incident concerns the pre-port macOS runtime and is separate from validation of the portable repository. No private profile data, logs, machine paths, coordinates, or personal report text are published here.
+
+At the scheduled 22:30 run, the authenticated task read the current day's record as `PENDING`, then stopped with `frontend_location_api_changed`. It did not submit a POST. The deployed school frontend had changed its minified locator export: the current student-page module imports `bl` from the entry module under a local alias and invokes that binding with a GCJ-02 location request. The previous runtime expected `bk`, so it failed closed instead of guessing.
+
+The operator updated the old runtime's expected alias to `bl`, then manually ran it with a fresh real location result (reported accuracy 55 m). At 23:23:13 it received report response code 0. At 23:23:15 it read back the same business date as `STUDENT_REPORTED` and confirmed the previously configured reason matched. No private reason text is reproduced here. This records the outcome of that specific old-runtime recovery; it does not mean the new portable repository has passed school E2E.
+
+The current entry exports `bl`; the student-page module imports it as local binding `W` and uses `W` in its GCJ-02 location call. The portable implementation uses `src/frontend-contract.mjs` to parse the current same-origin entry and student-page JavaScript with Acorn. It resolves the imported binding actually used by the direct `{ type: 'gcj02', success, fail }` call and verifies the corresponding entry export. `src/location.mjs` first uses `globalThis.uni.getLocation` bound to its owning object, then invokes the discovered entry export only when that API is unavailable. The parser rejects ambiguous or altered contracts (including spreads, duplicate required options, or computed keys) and fails closed rather than guessing aliases. It also validates the school landing origin and path before either location branch. `frontendLocationExport` defaults to `auto`; legacy explicit values such as `bk` and `bl` remain readable but are deprecated and do not override source discovery.
+
+Acorn is a JavaScript parser ([official README](https://github.com/acornjs/acorn/blob/master/README.md)). The observed [entry module](https://jzsz.uestc.edu.cn/daily-checkin-h5/assets/index-CqZyvL8l.js) and [student-page module](https://jzsz.uestc.edu.cn/daily-checkin-h5/assets/pages-student-report-today-home-index.Bdf9noCE.js) are public bundle snapshots and may change. The runtime discovers the module from the live page and validates the contract on each location attempt.
+
+## Follow-up validation
+
+The shared AST locator helper was deployed to the existing macOS runtime, with bundled Acorn under its MIT license; its runtime copy and repository source were confirmed byte-for-byte identical. A prepare-only run acquired a real location with 54 m reported accuracy and returned `dry_run_ready`, issuing neither check-in nor report POST. The existing launchd job was then kickstarted at 23:36; it exited successfully as `already_done` after reading the same business date as `INSTRUCTOR_REPORTED` and matching the configured text. Separately, the new adapter completed authenticated read-only location and saved-record checks with a 55 m reading and matching record. This is shared-locator/runtime validation and new-adapter read-only validation, not a full run of the new portable CLI. Windows and Linux remain offline-only validation targets.
+
+## Evidence boundary
+
+- The 22:30 failure and no-POST outcome, manual old-runtime correction, and subsequent saved-record check are maintainer-provided operational facts. Private supporting artifacts are intentionally excluded.
+- The shared helper deployment and Mac run outcomes above are maintainer-provided operational facts; private logs/records are excluded. The adapter check was authenticated and read-only, and did not exercise the new CLI submission path.
+- The public bundle snapshot shows a client-side source contract only. It does not establish server acceptance or guarantee future bundle stability. Windows/Linux remain unverified beyond offline tests.

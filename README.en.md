@@ -32,7 +32,7 @@ node bin/goodnight.mjs run --dry-run
 
 `run` tries check-in during the school's check-in window using real GCJ-02 location and an available valid dormitory geofence. If no valid dormitory geofence is available, or check-in is definitively rejected, it reads today's record again using the current authenticated session. It may fall back to reporting only if that fresh record remains `PENDING` and the actual location is suitable for reporting. The default `OUTSIDE` report applies only when the actual location is classified outside campus; campus location is never mislabeled as outside. An ambiguous check-in POST or timeout never triggers blind report fallback. Separate durable per-date journals are written before each operation's POST. If an outcome is unclear, run `check` first.
 
-Browser choices are `chrome` (default), `msedge`, and `chromium`. Prefer installed Chrome or Edge. To use Playwright Chromium, run `npx playwright install chromium` and initialize with `--browser chromium`. Installing Chromium does not provide real campus location. Location first uses `uni.getLocation`; if unavailable, it loads the current same-origin frontend module and looks up the configured `frontendLocationExport`. It stops if neither path works and does not guess another export name.
+Browser choices are `chrome` (default), `msedge`, and `chromium`. Prefer installed Chrome or Edge. To use Playwright Chromium, run `npx playwright install chromium` and initialize with `--browser chromium`. Installing Chromium does not provide real campus location. Location first uses `uni.getLocation`; if unavailable, Acorn parses the current same-origin entry and student-page modules to identify the named import actually called with `{type: "gcj02", success, fail}` and its entry export. A missing or changed contract fails closed; the code does not guess aliases.
 
 ## Daemon and service
 
@@ -51,7 +51,7 @@ Config, browser profile, authentication state, logs, and runtime state live outs
 
 The server-side session lifetime is unknown. Periodic client access only extends client-side retention. Treat `need_login` as a failure and log in again.
 
-An exclusive lock and separate durable per-date check-in and report journals prevent blind repeats after a crash or timeout. The `frontendLocationExport` setting (default `bk`) names the frontend location function. If the configured export is missing, fail closed rather than guess or use an LLM repair. `maxAccuracyMeters` defaults to 200 m; unknown or less precise readings stop the operation. Adjust it only for the genuine provider's actual accuracy, never to use a fixed location.
+An exclusive lock and separate durable per-date check-in and report journals prevent blind repeats after a crash or timeout. `frontendLocationExport` defaults to `auto`, which resolves the export from the current frontend source contract. Legacy explicit values such as `bk` and `bl` remain readable but are deprecated and do not override source discovery. If a unique valid binding cannot be found, the operation fails closed rather than guessing or using an LLM repair. `maxAccuracyMeters` defaults to 200 m; unknown or less precise readings stop the operation. Adjust it only for the genuine provider's actual accuracy, never to use a fixed location.
 
 ## Development
 
@@ -60,4 +60,4 @@ npm ci
 npm test
 ```
 
-CI runs offline tests on Node.js 22/24 and Ubuntu, macOS, and Windows, including synthetic tests for service-definition generators. These test candidate migration code; they do not establish that services were installed on those operating systems or that school E2E, GPS, or authentication works there. See [architecture](docs/architecture.md), [portability](docs/portability.md), and the [source audit](docs/source-audit.md).
+CI runs offline tests on Node.js 22/24 and Ubuntu, macOS, and Windows, including synthetic tests for service-definition generators. These test candidate migration code; they do not establish that services were installed on those operating systems or that school E2E, GPS, or authentication works there. The [2026-10-12 location-export incident](docs/incidents/2026-10-12-location-export.md) also records shared-locator testing on macOS and read-only checks with the new adapter; neither establishes full E2E completion of the new CLI. See [architecture](docs/architecture.md), [portability](docs/portability.md), and the [source audit](docs/source-audit.md).

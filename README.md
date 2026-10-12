@@ -33,7 +33,7 @@ node bin/goodnight.mjs run --dry-run
 
 `run` 先尝试在学校签到窗口内使用真实 GCJ-02 定位及有效宿舍圈签到。若没有可用的有效宿舍圈，或签到得到明确拒绝，程序会使用当前登录会话重新读取当天记录；只有记录仍为 `PENDING` 且位置判定适合报告时，才转为报告流程。默认“校外”报告只用于实际判定在校外的位置，绝不会把校园内位置标成校外。签到 POST 超时或结果不明属于不确定状态，程序不会因此盲目改发报告。签到和报告各有独立的按日持久日志，在发送相应 POST 之前落盘；结果不明时先运行 `check`。
 
-浏览器可选 `chrome`（默认）、`msedge`、`chromium`。优先使用已安装的 Chrome 或 Edge；Playwright Chromium 可用 `npx playwright install chromium` 安装，并在初始化时指定 `--browser chromium`。Chromium 安装本身不会提供真实校园定位。定位实现优先调用 `uni.getLocation`；不可用时才动态加载当前同源前端模块并读取 `frontendLocationExport` 指定的导出名。两条路径都不可用时失败停止，不会猜测其他别名。
+浏览器可选 `chrome`（默认）、`msedge`、`chromium`。优先使用已安装的 Chrome 或 Edge；Playwright Chromium 可用 `npx playwright install chromium` 安装，并在初始化时指定 `--browser chromium`。Chromium 安装本身不会提供真实校园定位。定位实现优先调用 `uni.getLocation`；不可用时通过 Acorn AST 解析当前同源入口和学生页面模块，发现实际发起 `{type: "gcj02", success, fail}` 调用的命名导入及其入口导出。若两条路径都不可用或前端契约变化，失败停止，不会猜测别名。
 
 ## 持续运行
 
@@ -56,7 +56,7 @@ node bin/goodnight.mjs service remove
 
 程序使用独占运行锁和分别对应签到、报告操作的按日期持久 POST 日志。进程崩溃或请求超时后，若结果不确定，不会盲目重试或从签到切换到报告；请先运行 `check` 查看学校当天记录，再根据结果处理。程序不导出 Cookie，也不应分享个人说明文本、日志或浏览器数据。
 
-`frontendLocationExport`（示例默认为 `bk`）指定前端导出的定位函数别名。该设置用于适配前端导出名变化；找不到所配置导出时应失败关闭，不得猜测坐标或用 LLM 修复。`maxAccuracyMeters` 默认 200 米；定位未知或精度差于该阈值时停止。只有真实定位提供方确实能给出较大误差时，才按实际情况调整阈值；不要使用固定位置。
+`frontendLocationExport` 默认 `auto`，运行时以当前前端源码契约解析定位导出。旧配置中的 `bk`、`bl` 等显式值仍可读取但已弃用；它们不会覆盖源码解析结果。找不到唯一、有效的前端导出时失败关闭，不得猜测坐标或用 LLM 修复。`maxAccuracyMeters` 默认 200 米；定位未知或精度差于该阈值时停止。只有真实定位提供方确实能给出较大误差时，才按实际情况调整阈值；不要使用固定位置。
 
 ## 开发
 
@@ -65,4 +65,4 @@ npm ci
 npm test
 ```
 
-CI 在 Node.js 22/24 和 Ubuntu、macOS、Windows 上运行离线测试，包括系统服务定义生成器的合成测试。这些是候选移植路径的代码测试，不表示服务已在对应真实操作系统安装测试，也不证明学校 E2E、GPS 或认证成功。架构和待核验主张见 [`docs/architecture.md`](docs/architecture.md)、[`docs/portability.md`](docs/portability.md)、[`docs/source-audit.md`](docs/source-audit.md)。
+CI 在 Node.js 22/24 和 Ubuntu、macOS、Windows 上运行离线测试，包括系统服务定义生成器的合成测试。这些是候选移植路径的代码测试，不表示服务已在对应真实操作系统安装测试，也不证明学校 E2E、GPS 或认证成功。2026-10-12 定位导出事故及后续 macOS 共享定位器验证记录见 [`docs/incidents/2026-10-12-location-export.md`](docs/incidents/2026-10-12-location-export.md)；这些记录不代表新 CLI 已完成学校 E2E。架构和待核验主张见 [`docs/architecture.md`](docs/architecture.md)、[`docs/portability.md`](docs/portability.md)、[`docs/source-audit.md`](docs/source-audit.md)。

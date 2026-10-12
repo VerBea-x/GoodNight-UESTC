@@ -23,3 +23,15 @@ test('local cookie retention changes only the school SESSION after successful au
   ctx.addCookies=async cookies=>{added=cookies;};
   await api.authenticate();assert.equal(added.length,1);assert.ok(added[0].expires>Date.now()/1000);assert.equal(added[0].name,'SESSION');
 });
+test('adapter ignores stale alias configuration and resolves the observed location call',async()=>{
+  const entryUrl=ORIGIN+'/daily-checkin-h5/assets/index-test.js';
+  const entry='const old=()=>{},gps=()=>{};const route="./pages-student-report-today-home-index.test.js";export{old as bk,gps as bl};';
+  const student='import{bl as W}from"./index-test.js";W({type:"gcj02",success(x){},fail(e){}});';
+  let calls=0,binding,closed=false,permissions=false;
+  const ctx={grantPermissions:async()=>{permissions=true;},newPage:async()=>page,request:{get:async url=>({status:()=>200,url:()=>url,text:async()=>url===entryUrl?entry:student,dispose:async()=>{}})}};
+  const page={url:()=>ORIGIN+'/daily-checkin-h5/index.html?appId=294',context:()=>ctx,goto:async()=>{assert.equal(permissions,true);},close:async()=>{closed=true;},evaluate:async(_fn,arg)=>{
+    if(arg){binding=arg.binding;return {latitude:10,longitude:10,accuracy:20};}return ++calls===1?false:entryUrl;
+  }};
+  const r=await createUestcAdapter(ctx,{...DEFAULTS,frontendLocationExport:'bk'}).getLocation();
+  assert.equal(binding.exportName,'bl');assert.equal(r.accuracy,20);assert.equal(closed,true);
+});
