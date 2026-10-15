@@ -1,6 +1,7 @@
 import { apiSucceeded } from '../policy.mjs';
 import { locate } from '../location.mjs';
 export const ORIGIN = 'https://jzsz.uestc.edu.cn';
+export const CLIENT_SESSION_RETENTION_SECONDS = 7 * 24 * 3600;
 export const PORTAL = `${ORIGIN}/#/hall/home`;
 export const PAGE = `${ORIGIN}/daily-checkin-h5/index.html?appId=294#/pages/student/report-today/home/index`;
 export class BusinessError extends Error { constructor(code) { super(code); this.code = code; } }
@@ -20,8 +21,9 @@ export function createUestcAdapter(ctx, config) {
       const r = await request('/auth/user-info');
       if (!apiSucceeded(r) || !r.data) throw new BusinessError('auth_check_failed');
       const session = (await ctx.cookies(ORIGIN)).find(c => c.name === 'SESSION' && c.domain === new URL(ORIGIN).hostname);
+      // Preserve validated credentials through a prolonged connection outage.
       // Client retention is NOT server-side reauthentication or guaranteed renewal.
-      if (session) await ctx.addCookies([{ ...session, expires: Math.floor(Date.now() / 1000) + 3600 }]);
+      if (session) await ctx.addCookies([{ ...session, expires: Math.max(session.expires || 0, Math.floor(Date.now() / 1000) + CLIENT_SESSION_RETENTION_SECONDS) }]);
     },
     getToday: () => request('/student-checkin-record/today'),
     getSchedule: () => request('/checkin-schedule/effective'),
