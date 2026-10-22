@@ -13,18 +13,24 @@ import { createUestcAdapter, PORTAL } from '../src/adapters/uestc.mjs';
 import { inspect, runWithRetries } from '../src/runner.mjs';
 import { daemon } from '../src/daemon.mjs';
 import { installService, uninstallService } from '../src/service.mjs';
+import { startWeb } from '../src/web.mjs';
 const HELP = `GoodNight — 晚安成电自动填报（纯脚本，不调用 LLM）
 用法：node bin/goodnight.mjs <命令> [选项]
  init                  设置说明；留空默认校外旅游说明
  login                 打开独立浏览器，首次/恢复登录由本人完成
+ location --mode virtual --latitude <纬度> --longitude <经度> [--accuracy <米>] [--time HH:mm]
+                       设置 GCJ-02 虚拟位置和可选签到时间（仅用于签到）
+ location --mode real   切回设备定位
  doctor [--online]     本地环境检查，可选业务登录检查
  check                 只读查询今日记录，不提交
  run [--dry-run]       优先打卡，无法打卡再填报；dry-run不提交
  daemon                上海时间常驻调度（每天填报、周期会话检查）
+ web [--port 3210]     打开本机网页控制台，按账号管理配置与自动计划
  status                显示最近结果、预检、失败记录及会话状态
  service install       安装当前用户的系统服务
  service remove        卸载服务，保留配置/登录数据
  service install --write-only  只生成文件，不装载服务
+ service install --web [--port 3210]  后台运行网页控制台及其自动计划
 全局：--data-dir <路径> 或 GOODNIGHT_HOME，数据默认在用户系统目录
 init选项：--remark <真实说明10–200字> --keyword <情况类别>
           --time HH:mm --browser chrome|msedge|chromium --force
@@ -74,17 +80,42 @@ async function login(config,store) {
     await createUestcAdapter(ctx,config).authenticate();output({result:'session_valid'});
   }finally{rl?.close();if(ctx)await ctx.close().catch(()=>{});unlock();}
 }
+function configureLocation(store, v) {
+  if (!['real', 'virtual'].includes(v.mode)) throw new Error('请指定 --mode real 或 --mode virtual');
+  const config = loadConfig(store.dir);
+  if (v.mode === 'real' && [v.latitude, v.longitude, v.accuracy].some(x => x !== undefined)) throw new Error('坐标参数仅用于 --mode virtual');
+  const number = (value, name) => {
+    if (typeof value !== 'string' || !value.trim() || !Number.isFinite(Number(value))) throw new Error(`${name} 必须是数字`);
+    return Number(value);
+  };
+  const virtualLocation = v.mode === 'virtual' ? {
+    latitude: number(v.latitude, '--latitude'), longitude: number(v.longitude, '--longitude'),
+    accuracy: v.accuracy === undefined ? 20 : number(v.accuracy, '--accuracy'),
+  } : config.virtualLocation;
+  const next = validateConfig({ ...config, locationMode: v.mode, virtualLocation, reportTime: v.time ?? config.reportTime });
+  const unlock = store.acquire();
+  if (!unlock) throw new Error('任务正在使用配置，请稍后重试');
+  try { store.write('config.json', next); } finally { unlock(); }
+  output({result:'configured',locationMode:next.locationMode,virtualLocation:next.locationMode === 'virtual' ? next.virtualLocation : null,reportTime:next.reportTime,next:'重启已运行的 daemon/服务，再执行 run --dry-run'});
+}
 async function main() {
-  const {values:v,positionals:p}=parseArgs({allowPositionals:true,options:{'data-dir':{type:'string'},help:{type:'boolean',short:'h'},remark:{type:'string'},keyword:{type:'string'},time:{type:'string'},browser:{type:'string'},force:{type:'boolean'},online:{type:'boolean'},'dry-run':{type:'boolean'},'write-only':{type:'boolean'}}});
+  const {values:v,positionals:p}=parseArgs({allowPositionals:true,options:{'data-dir':{type:'string'},help:{type:'boolean',short:'h'},remark:{type:'string'},keyword:{type:'string'},time:{type:'string'},browser:{type:'string'},force:{type:'boolean'},online:{type:'boolean'},'dry-run':{type:'boolean'},'write-only':{type:'boolean'},mode:{type:'string'},latitude:{type:'string'},longitude:{type:'string'},accuracy:{type:'string'},web:{type:'boolean'},port:{type:'string'}}});
   if(v.help||!p.length){console.log(HELP);return;}
-  const cmd=p[0];if(!['init','login','doctor','check','run','daemon','status','service'].includes(cmd))throw new Error('未知命令；用 --help 查看');
+  const cmd=p[0];if(!['init','login','location','doctor','check','run','daemon','web','status','service'].includes(cmd))throw new Error('未知命令；用 --help 查看');
   if((cmd==='service'&&(!['install','remove'].includes(p[1])||p.length!==2))||(cmd!=='service'&&p.length!==1))throw new Error('命令参数不正确；用 --help 查看');
   const dataDir=path.resolve(v['data-dir']||defaultDataDir());
   if(dataDir===path.parse(dataDir).root)throw new Error('数据目录不能是文件系统根目录');
   const store=new Store(dataDir);
+  if(cmd==='web') {
+    const port=Number(v.port??3210);if(!Number.isInteger(port)||port<1||port>65535)throw new Error('端口须为 1–65535');
+    const abort=new AbortController();process.once('SIGINT',()=>abort.abort());process.once('SIGTERM',()=>abort.abort());
+    const app=await startWeb({dataDir,port,signal:abort.signal});console.log(`GoodNight 本机工作台：${app.url}`);return;
+  }
   if(cmd==='init'){await initialize(store,v);return;}
+  if(cmd==='location'){configureLocation(store,v);return;}
   if(cmd==='status'){output({dataDir,lastReport:store.read('last-result.json'),lastSession:store.read('last-session.json'),lastPreflight:store.read('last-preflight.json'),lastFailure:store.read('last-failure.json'),scheduler:store.read('scheduler.json')});return;}
   if(cmd==='service'&&p[1]==='remove') {output(await uninstallService({dataDir,apply:!v['write-only']}));return;}
+  if(cmd==='service'&&v.web) {output(await installService({dataDir,entrypoint:fileURLToPath(import.meta.url),node:process.execPath,apply:!v['write-only'],mode:'web',port:Number(v.port??3210)}));return;}
   if(cmd==='doctor') {
     let config,configError;try{config=loadConfig(dataDir);}catch(e){configError=e.message;}
     const result={node:process.version,nodeSupported:Number(process.versions.node.split('.')[0])>=22,platform:process.platform,dataDir,configValid:!!config,configError,browser:config?.browserChannel,browserFound:config?browserInstalled(config):false};
@@ -99,6 +130,6 @@ async function main() {
     await daemon({config,store,signal:abort.signal});return;
   }
   const out=cmd==='check'?await inspect({config,store}):await runWithRetries({config,store,dryRun:!!v['dry-run']});
-  output(out);process.exitCode=good.has(out.result)?0:3;
+  output({...out,locationMode:config.locationMode});process.exitCode=good.has(out.result)?0:3;
 }
 main().catch(e=>{console.error(JSON.stringify({result:'error',message:e instanceof Error?e.message:'运行失败'}));process.exitCode=3;});

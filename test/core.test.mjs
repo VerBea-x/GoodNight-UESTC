@@ -6,7 +6,7 @@ import path from 'node:path';
 import { DEFAULTS, DEFAULT_REASON, validateConfig, defaultDataDir } from '../src/config.mjs';
 import { Store } from '../src/store.mjs';
 import { runDaily, runWithRetries } from '../src/runner.mjs';
-import { BusinessError } from '../src/adapters/uestc.mjs';
+import { BusinessError, createUestcAdapter } from '../src/adapters/uestc.mjs';
 import { reportWindow, checkinWindow, geometryContains, locationType, findDorm } from '../src/policy.mjs';
 import { dueReport, tick as tickActual } from '../src/daemon.mjs';
 import { inspect } from '../src/runner.mjs';
@@ -37,6 +37,28 @@ function setup(t, overrides={}) {
   return {options,store,calls,adapter,setRecord:r=>{record=r;}};
 }
 const posts=calls=>calls.filter(x=>Array.isArray(x));
+
+test('virtual coordinates are used for check-in, including dry-run, without a location provider',async t=>{
+  const virtualLocation={latitude:30,longitude:104,accuracy:10};
+  const config=validateConfig({...DEFAULTS,locationMode:'virtual',virtualLocation});
+  const api=createUestcAdapter({},config);
+  const f=setup(t,{getLocation:()=>api.getLocation(),getCheckinLocations:async()=>ok([{...virtualLocation,radiusMeter:100}])});
+  const options={...f.options,config};
+  assert.equal((await runDaily({...options,dryRun:true})).result,'dry_run_ready');
+  assert.equal(posts(f.calls).length,0);
+  const out=await runDaily(options);
+  assert.equal(out.result,'success');assert.equal(out.operation,'checkin');
+  const body=posts(f.calls)[0][1];assert.equal(body.latitude,30);assert.equal(body.longitude,104);assert.equal(body.accuracy,10);
+});
+test('virtual mode never falls back to a report on missing dorm or explicit rejection',async t=>{
+  for(const rejected of [false,true]) {
+    const f=setup(t, rejected?{getCheckinLocations:async()=>ok([{...geo,radiusMeter:100}]),submitCheckin:async body=>{f.calls.push(['checkin',body]);return {code:4001,ok:false};}}:{});
+    const config=validateConfig({...DEFAULTS,locationMode:'virtual',virtualLocation:geo});
+    const out=await runDaily({...f.options,config});
+    assert.equal(out.reason,'virtual_checkin_unavailable');
+    assert.deepEqual(posts(f.calls).map(x=>x[0]),rejected?['checkin']:[]);
+  }
+});
 
 test('blank reason defaults; custom reason and configuration are validated',()=>{
   assert.equal(validateConfig({remark:'   '}).remark,DEFAULT_REASON);

@@ -150,7 +150,7 @@ function refreshFailureSummary(store, date, timestamp) {
 function notificationMessage(payload) {
   const phase = VALID_PHASES.has(payload?.phase) ? payload.phase : 'recovery';
   const result = FAILURE_RESULTS.has(payload?.result) ? payload.result : 'execution_failed';
-  return `GoodNight ${phase}: ${result}. Check GoodNight status.`;
+  return `晚安成电运行需要检查（${phase}: ${result}）。请打开本机工作台核对学校记录。`;
 }
 
 function defaultRunner(file, args) {
@@ -167,9 +167,16 @@ function defaultRunner(file, args) {
 }
 
 /** Best-effort local desktop alert. All user-controlled text is passed as argv data. */
-export async function notifyFailure(payload, { platform = process.platform, runner = defaultRunner } = {}) {
+export async function notifyReview(options = {}) {
+  return sendDesktopNotification('晚安成电已完成今日自动签到检查。请打开本机工作台，核对学校保存的记录。', options);
+}
+
+export async function notifyFailure(payload, options = {}) {
+  return sendDesktopNotification(notificationMessage(payload),options);
+}
+
+async function sendDesktopNotification(message, { platform = process.platform, runner = defaultRunner } = {}) {
   if (typeof runner !== 'function') throw new Error('notification_runner_failed');
-  const message = notificationMessage(payload);
   if (platform === 'darwin') {
     await runner('/usr/bin/osascript', ['-e', 'on run argv\n display notification (item 1 of argv) with title "GoodNight"\nend run', '--', message]);
     return;

@@ -1,6 +1,6 @@
 {
   "name": "goodnight-uestc",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Portable, deterministic UESTC daily reporting with saved-record verification",
   "type": "module",
@@ -14,10 +14,13 @@
   "scripts": {
     "test": "node --test",
     "start": "node bin/goodnight.mjs",
+    "web": "node bin/goodnight.mjs web",
     "doctor": "node bin/goodnight.mjs doctor"
   },
   "dependencies": {
     "acorn": "8.19.0",
+    "coordtransform": "2.1.2",
+    "leaflet": "1.9.4",
     "playwright": "1.62.1"
   }
 }

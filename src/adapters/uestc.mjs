@@ -1,5 +1,6 @@
 import { apiSucceeded } from '../policy.mjs';
 import { locate } from '../location.mjs';
+import { validateConfig } from '../config.mjs';
 export const ORIGIN = 'https://jzsz.uestc.edu.cn';
 export const CLIENT_SESSION_RETENTION_SECONDS = 7 * 24 * 3600;
 export const PORTAL = `${ORIGIN}/#/hall/home`;
@@ -34,6 +35,7 @@ export function createUestcAdapter(ctx, config) {
     getKeywords: () => request('/case-keyword/active?locationTypeCode=' + config.locationType),
     submit: body => request('/student-checkin-record/report', body),
     async getLocation() {
+      if (config.locationMode === 'virtual') return { ...validateConfig(config).virtualLocation };
       await ctx.grantPermissions(['geolocation'], { origin: ORIGIN });
       const page = await ctx.newPage();
       try {

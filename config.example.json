@@ -13,5 +13,7 @@
   "preflightLeadMinutes": 20,
   "recoveryIntervalMinutes": 10,
   "recoveryCutoff": "23:55",
-  "notifications": true
+  "notifications": true,
+  "locationMode": "real",
+  "virtualLocation": null
 }
