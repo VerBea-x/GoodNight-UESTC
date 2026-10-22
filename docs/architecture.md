@@ -6,6 +6,8 @@ GoodNight is a deterministic Node.js command-line program backed by Playwright. 
 
 The daily operation flow is:
 
+Location defaults to the device/browser provider (`locationMode: "real"`). With `locationMode: "virtual"`, the adapter returns validated `virtualLocation` GCJ-02 coordinates directly, without invoking the browser location provider. Preflight and check-in use the same selected provider. Virtual mode is check-in only: school windows, dormitory circles, submission journals and saved-record verification still apply, but failure does not fall through to a report. Use the CLI `location` command to save coordinates and optionally change the daily time, then restart a running daemon/service to load them.
+
 1. Load per-user configuration and the authenticated current-day record and server schedule.
 2. Obtain real location through the frontend API with GCJ-02 requested; reject unknown or over-limit accuracy (default 200 m).
 3. During the check-in server window, try check-in using available valid dormitory geofences.

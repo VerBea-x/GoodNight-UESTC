@@ -52,7 +52,13 @@ function resolveOptions(options = {}) {
     : paths.resolve(safe(options.dataDir, 'dataDir'));
   const entrypoint = paths.resolve(safe(options.entrypoint ?? defaultEntry, 'entrypoint'));
   const node = paths.resolve(safe(options.node ?? process.execPath, 'node'));
-  const args = ['daemon', '--data-dir', dataDir];
+  const mode=options.mode??'daemon';
+  if(!['daemon','web'].includes(mode))throw new Error('Service mode must be daemon or web');
+  const args = [mode, '--data-dir', dataDir];
+  if(mode==='web'){
+    const port=options.port??3210;if(!Number.isInteger(port)||port<1||port>65535)throw new Error('Invalid web port');
+    args.push('--port',String(port));
+  }
   return { ...options, platform, env, home, dataDir, entrypoint, node, args };
 }
 
@@ -93,13 +99,20 @@ function renderLinux(o) {
 function renderWindows(o) {
   const base = o.env.LOCALAPPDATA || path.win32.join(o.home, 'AppData', 'Local');
   const file = path.win32.join(base, 'GoodNight', `${SERVICE_ID}.xml`);
+  const launcher=path.win32.resolve(path.win32.dirname(o.entrypoint),'..',`${SERVICE_ID}.vbs`);
+  const launchLog=path.win32.join(base,'GoodNight',`${SERVICE_ID}.log`);
   const username = safe(o.env.USERNAME ?? '', 'Windows username (USERNAME environment variable)');
   const principal = o.env.USERDOMAIN ? `${safe(o.env.USERDOMAIN, 'Windows user domain')}\\${username}` : username;
-  const args = [o.entrypoint, ...o.args].map(windowsArg).join(' ');
-  const content = `<?xml version="1.0" encoding="UTF-8"?>\n<Task xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task" version="1.3">\n  <RegistrationInfo><Description>GoodNight per-user daemon</Description><URI>\\${SERVICE_ID}</URI></RegistrationInfo>\n  <Triggers><LogonTrigger><UserId>${xml(principal)}</UserId><Enabled>true</Enabled></LogonTrigger></Triggers>\n  <Principals><Principal id="Author"><UserId>${xml(principal)}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>\n  <Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><AllowHardTerminate>true</AllowHardTerminate><StartWhenAvailable>true</StartWhenAvailable><RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable><AllowStartOnDemand>true</AllowStartOnDemand><Enabled>true</Enabled><Hidden>false</Hidden><WakeToRun>false</WakeToRun><ExecutionTimeLimit>PT0S</ExecutionTimeLimit><RestartOnFailure><Interval>PT1M</Interval><Count>3</Count></RestartOnFailure><Priority>7</Priority></Settings>\n  <Actions Context="Author"><Exec><Command>${xml(o.node)}</Command><Arguments>${xml(args)}</Arguments><WorkingDirectory>${xml(o.home)}</WorkingDirectory></Exec></Actions>\n</Task>\n`;
+  const args = [o.node,o.entrypoint,...o.args].map(windowsArg).join(' ');
+  const vbsString=value=>`"${safe(value,'VBScript value').replaceAll('\"','\"\"')}"`;
+  const command=`cmd.exe /d /s /c "${args} >> ${windowsArg(launchLog)} 2>&1"`;
+  const launcherContent=`Set shell = CreateObject("WScript.Shell")\r\nshell.CurrentDirectory = ${vbsString(o.home)}\r\nexitCode = shell.Run(${vbsString(command)}, 0, True)\r\nWScript.Quit exitCode\r\n`;
+  const wscript=path.win32.join(o.env.SystemRoot||'C:\\Windows','System32','wscript.exe');
+  const content = `<?xml version="1.0" encoding="UTF-16"?>\n<Task xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task" version="1.3">\n  <RegistrationInfo><Description>GoodNight per-user daemon</Description><URI>\\${SERVICE_ID}</URI></RegistrationInfo>\n  <Triggers><LogonTrigger><UserId>${xml(principal)}</UserId><Enabled>true</Enabled></LogonTrigger></Triggers>\n  <Principals><Principal id="Author"><UserId>${xml(principal)}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>\n  <Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries><AllowHardTerminate>true</AllowHardTerminate><StartWhenAvailable>true</StartWhenAvailable><RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable><AllowStartOnDemand>true</AllowStartOnDemand><Enabled>true</Enabled><Hidden>false</Hidden><WakeToRun>false</WakeToRun><ExecutionTimeLimit>PT0S</ExecutionTimeLimit><RestartOnFailure><Interval>PT1M</Interval><Count>3</Count></RestartOnFailure><Priority>7</Priority></Settings>\n  <Actions Context="Author"><Exec><Command>${xml(wscript)}</Command><Arguments>${xml(windowsArg(launcher))}</Arguments><WorkingDirectory>${xml(o.home)}</WorkingDirectory></Exec></Actions>\n</Task>\n`;
   return {
-    files: [{ path: file, content }],
+    files: [{ path: file, content, encoding: 'utf16le' },{path:launcher,content:launcherContent,encoding:'utf16le'}],
     commands: [
+      { file: 'schtasks.exe', args: ['/End', '/TN', SERVICE_ID], optional: true, ignoreExitCodes: [1] },
       { file: 'schtasks.exe', args: ['/Create', '/TN', SERVICE_ID, '/XML', file, '/F'] },
       { file: 'schtasks.exe', args: ['/Run', '/TN', SERVICE_ID] },
     ],
@@ -147,7 +160,9 @@ async function runCommands(commands, runner) {
 async function writeRendered(files) {
   for (const file of files) {
     await mkdir(path.dirname(file.path), { recursive: true });
-    await writeFile(file.path, file.content, { encoding: 'utf8', mode: 0o600 });
+    const encoding = file.encoding ?? 'utf8';
+    const content = encoding === 'utf16le' ? '\uFEFF' + file.content : file.content;
+    await writeFile(file.path, content, { encoding, mode: 0o600 });
   }
 }
 

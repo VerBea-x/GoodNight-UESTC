@@ -1,0 +1,16 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'io.github.beicheno2.goodnight'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'io.github.beicheno2.goodnight'
+        minSdk 26
+        targetSdk 35
+        versionCode 9
+        versionName '0.6.2'
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+
+dependencies { implementation 'androidx.webkit:webkit:1.17.1' }

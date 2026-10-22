@@ -2,7 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 export const DEFAULT_REASON = '在校外旅游会注意自己安全，导员放心';
-export const DEFAULTS = Object.freeze({ version: 1, remark: DEFAULT_REASON, keyword: '旅游', locationType: 'OUTSIDE', reportTime: '22:30', sessionIntervalMinutes: 10, catchUpMinutes: 30, browserChannel: 'chrome', headless: true, frontendLocationExport: 'auto', maxAccuracyMeters: 200, preflightLeadMinutes: 20, recoveryIntervalMinutes: 10, recoveryCutoff: '23:55', notifications: true });
+export const DEFAULTS = Object.freeze({ version: 1, remark: DEFAULT_REASON, keyword: '旅游', locationType: 'OUTSIDE', reportTime: '22:30', sessionIntervalMinutes: 10, catchUpMinutes: 30, browserChannel: 'chrome', headless: true, frontendLocationExport: 'auto', maxAccuracyMeters: 200, preflightLeadMinutes: 20, recoveryIntervalMinutes: 10, recoveryCutoff: '23:55', notifications: true, locationMode: 'real', virtualLocation: null });
 export function defaultDataDir({ platform = process.platform, home = os.homedir(), env = process.env } = {}) {
   const paths=platform==='win32'?path.win32:path.posix;
   if (env.GOODNIGHT_HOME) return paths.resolve(env.GOODNIGHT_HOME);
@@ -30,6 +30,16 @@ export function validateConfig(input) {
   if (typeof c.headless !== 'boolean') throw new Error('headless 必须是布尔值');
   if (typeof c.frontendLocationExport !== 'string' || !/^[\w$]{1,80}$/.test(c.frontendLocationExport)) throw new Error('定位导出名无效');
   if (!Number.isFinite(c.maxAccuracyMeters) || c.maxAccuracyMeters < 1 || c.maxAccuracyMeters > 5000) throw new Error('最大定位误差必须为1–5000米');
+  if (!['real', 'virtual'].includes(c.locationMode)) throw new Error('locationMode 必须是 real 或 virtual');
+  if (c.virtualLocation !== null) {
+    const p = c.virtualLocation;
+    if (!p || typeof p !== 'object' || Array.isArray(p) || Object.keys(p).some(k => !['latitude', 'longitude', 'accuracy'].includes(k)) ||
+        ![p.latitude, p.longitude, p.accuracy].every(Number.isFinite) || Math.abs(p.latitude) > 90 || Math.abs(p.longitude) > 180 || p.accuracy < 0 || p.accuracy > c.maxAccuracyMeters) {
+      throw new Error('虚拟位置须包含有效 GCJ-02 经纬度及不超过 maxAccuracyMeters 的非负精度');
+    }
+    c.virtualLocation = { latitude: p.latitude, longitude: p.longitude, accuracy: p.accuracy };
+  }
+  if (c.locationMode === 'virtual' && !c.virtualLocation) throw new Error('虚拟定位模式需要设置 virtualLocation');
   return c;
 }
 export function loadConfig(dataDir) {

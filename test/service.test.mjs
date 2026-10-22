@@ -29,6 +29,8 @@ test('renders a persistent launch agent for macOS', () => {
 test('renders a per-user Windows logon task with current-user interactive launch', () => {
   const result = renderService({ ...base, platform: 'win32' });
   const xml = result.files[0].content;
+  assert.equal(result.files[0].encoding, 'utf16le');
+  assert.match(xml, /encoding="UTF-16"/);
   assert.match(xml, /<Task xmlns="http:\/\/schemas\.microsoft\.com\/windows\/2004\/02\/mit\/task" version="1\.3">/);
   assert.match(xml, /<LogonTrigger><UserId>EXAMPLE\\Zoë &amp; O&apos;Brien<\/UserId><Enabled>true<\/Enabled><\/LogonTrigger>/);
   assert.match(xml, /<LogonType>InteractiveToken<\/LogonType>/);
@@ -36,29 +38,54 @@ test('renders a per-user Windows logon task with current-user interactive launch
   assert.match(xml, /<ExecutionTimeLimit>PT0S<\/ExecutionTimeLimit>/);
   assert.match(xml, /<RestartOnFailure><Interval>PT1M<\/Interval><Count>3<\/Count><\/RestartOnFailure>/);
   assert.match(xml, /EXAMPLE\\Zoë &amp; O&apos;Brien/);
-  assert.match(xml, /GoodNight &amp; Data/);
-  assert.deepEqual(result.commands[0].args.slice(0, 3), ['/Create', '/TN', SERVICE_ID]);
-  assert.equal(result.commands[0].file, 'schtasks.exe');
-  assert.deepEqual(result.commands[1].args, ['/Run', '/TN', SERVICE_ID]);
+  assert.match(result.files[1].content, /GoodNight & Data/);
+  assert.match(xml, /wscript\.exe/);
+  assert.match(result.files[1].content, /shell\.Run\(.*?, 0, True\)/);
+  assert.match(result.files[1].content, /node/);
+  assert.equal(result.files[1].encoding,'utf16le');
+  assert.deepEqual(result.commands[0].args, ['/End', '/TN', SERVICE_ID]);
+  assert.deepEqual(result.commands[1].args.slice(0, 3), ['/Create', '/TN', SERVICE_ID]);
+  assert.equal(result.commands[1].file, 'schtasks.exe');
+  assert.deepEqual(result.commands[2].args, ['/Run', '/TN', SERVICE_ID]);
   assert.deepEqual(result.uninstallCommands.map(command => command.optional === true), [true, false]);
 });
 
 test('uses config.mjs default data paths and environment overrides on each platform', () => {
   const cases = [
-    { platform: 'darwin', home: '/Users/alice', env: { HOME: '/Users/alice', GOODNIGHT_HOME: '/Volumes/Data/goodnight' } },
+    { platform: 'darwin', home: '/Users/alice', env: { HOME: '/Users/alice', UID:'501', GOODNIGHT_HOME: '/Volumes/Data/goodnight' } },
     { platform: 'win32', home: 'C:\\Users\\Alice', env: { USERNAME: 'Alice', LOCALAPPDATA: 'C:\\Users\\Alice\\AppData\\Local', GOODNIGHT_HOME: 'D:\\GoodNight' } },
     { platform: 'linux', home: '/home/alice', env: { HOME: '/home/alice', XDG_STATE_HOME: '/run/user/1000/state' } },
   ];
   for (const entry of cases) {
     const result = renderService({ ...entry, node: entry.platform === 'win32' ? 'C:\\Program Files\\nodejs\\node.exe' : '/usr/bin/node', entrypoint: entry.platform === 'win32' ? 'C:\\GoodNight\\bin\\goodnight.mjs' : '/opt/goodnight/bin/goodnight.mjs' });
     const expected = defaultDataDir({ platform: entry.platform, home: entry.home, env: { ...process.env, ...entry.env } });
-    assert.ok(result.files[0].content.includes(expected), `${entry.platform} should use config.mjs data path ${expected}`);
-    assert.ok(result.files[0].content.includes('--data-dir'), `${entry.platform} should pass an explicit data directory`);
+    const rendered=result.files.map(file=>file.content).join('\n');
+    assert.ok(rendered.includes(expected), `${entry.platform} should use config.mjs data path ${expected}`);
+    assert.ok(rendered.includes('--data-dir'), `${entry.platform} should pass an explicit data directory`);
   }
 });
 
 test('Windows task rendering requires the current USERNAME identity', () => {
   assert.throws(() => renderService({ ...base, platform: 'win32', env: { USERNAME: '', USERDOMAIN: '' } }), /Windows username.*USERNAME/);
+});
+
+test('web service starts the dashboard with an explicit port on all platforms',()=>{
+  for(const platform of ['win32','darwin','linux']){
+    const result=renderService({...base,platform,mode:'web',port:3211});
+    const rendered=result.files.map(file=>file.content).join('\n');
+    assert.match(rendered,/web/);assert.match(rendered,/--port/);assert.match(rendered,/3211/);
+  }
+  assert.throws(()=>renderService({...base,platform:'win32',mode:'web',port:0}),/port/);
+  assert.throws(()=>renderService({...base,platform:'win32',mode:'other'}),/mode/);
+});
+
+test('Windows task file uses UTF-16LE with BOM for schtasks import', async t => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'goodnight-service-encoding-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const result = await installService({ ...base, platform:'win32', entrypoint:path.join(temp,'bin','goodnight.mjs'),env:{...base.env,LOCALAPPDATA:temp}, apply:false });
+  const bytes = await readFile(result.files[0].path);
+  assert.deepEqual([...bytes.subarray(0,2)],[0xff,0xfe]);
+  assert.equal(bytes.subarray(2).toString('utf16le'),result.files[0].content);
 });
 
 test('renders a systemd user daemon attached to the graphical session target', () => {
@@ -129,14 +156,15 @@ test('installer passes argv without a shell and distinguishes missing tooling an
 
 test('Windows registration and start failures propagate; only task stop exit code 1 is optional', { skip: process.platform !== 'win32' }, async () => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'goodnight-service-'));
-  const options = { platform: 'win32', home: 'C:\\Users\\Alice', dataDir: 'C:\\Users\\Alice\\state', entrypoint: 'C:\\GoodNight\\goodnight.mjs', node: 'C:\\Node\\node.exe', env: { USERNAME: 'Alice', LOCALAPPDATA: `${temp}\\Local` } };
+  const options = { platform: 'win32', home: 'C:\\Users\\Alice', dataDir: 'C:\\Users\\Alice\\state', entrypoint: path.win32.join(temp,'bin','goodnight.mjs'), node: 'C:\\Node\\node.exe', env: { USERNAME: 'Alice', LOCALAPPDATA: `${temp}\\Local` } };
   try {
     const calls = [];
     await installService({ ...options, commandRunner: async (file, args) => { calls.push(args); return { code: 0 }; } });
-    assert.deepEqual(calls[0].slice(0, 4), ['/Create', '/TN', SERVICE_ID, '/XML']);
-    assert.ok(calls[0][4].endsWith(`Local\\GoodNight\\${SERVICE_ID}.xml`));
-    assert.deepEqual(calls[1], ['/Run', '/TN', SERVICE_ID]);
-    await assert.rejects(installService({ ...options, commandRunner: async () => ({ code: 1 }) }), /failed with exit code 1/);
+    assert.deepEqual(calls[0], ['/End', '/TN', SERVICE_ID]);
+    assert.deepEqual(calls[1].slice(0, 4), ['/Create', '/TN', SERVICE_ID, '/XML']);
+    assert.ok(calls[1][4].endsWith(`Local\\GoodNight\\${SERVICE_ID}.xml`));
+    assert.deepEqual(calls[2], ['/Run', '/TN', SERVICE_ID]);
+    await assert.rejects(installService({ ...options, commandRunner: async (_file,args) => ({ code: args[0]==='/End'?0:1 }) }), /failed with exit code 1/);
     await assert.rejects(uninstallService({ ...options, commandRunner: async (_file, args) => args[0] === '/End' ? { code: 5 } : { code: 0 } }), /permission denied/);
     await uninstallService({ ...options, commandRunner: async (_file, args) => args[0] === '/End' ? { code: 1 } : { code: 0 } });
     await assert.rejects(uninstallService({ ...options, commandRunner: async (_file, args) => args[0] === '/End' ? { code: 1 } : { code: 5 } }), /permission denied/);

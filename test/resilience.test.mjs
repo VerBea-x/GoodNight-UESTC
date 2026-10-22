@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { preflightDue, recoveryDue, recordOutcome, notifyFailure } from '../src/resilience.mjs';
+import { preflightDue, recoveryDue, recordOutcome, notifyFailure, notifyReview } from '../src/resilience.mjs';
 
 const at = value => new Date(value);
 const config = { reportTime: '20:30', preflightLeadMinutes: 20, recoveryIntervalMinutes: 10, recoveryCutoff: '23:55' };
@@ -147,9 +147,16 @@ test('notification platform commands keep message data in argv and reject unknow
     if (platform === 'darwin') assert.ok(captured.args.includes('--'));
     if (platform === 'win32') {
       const script = Buffer.from(captured.args[captured.args.indexOf('-EncodedCommand') + 1], 'base64').toString('utf16le');
-      assert.ok(script.includes("Popup('GoodNight report: report_rejected. Check GoodNight status.', 5"));
+      assert.ok(script.includes("Popup('晚安成电运行需要检查（report: report_rejected）。请打开本机工作台核对学校记录。', 5"));
       assert.equal(script.includes('touch /tmp/no'), false);
     }
   }
   await assert.rejects(notifyFailure({}, { platform: 'plan9', runner: async () => {} }), /notification_platform_unsupported/);
+});
+
+test('successful daily result can prompt a local record review', async () => {
+  let encoded;
+  await notifyReview({platform:'win32',runner:async (_file,args)=>{encoded=args[args.indexOf('-EncodedCommand')+1];}});
+  const script=Buffer.from(encoded,'base64').toString('utf16le');
+  assert.match(script,/请打开本机工作台，核对学校保存的记录/);
 });

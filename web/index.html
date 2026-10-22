@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101d33"><title>晚安成电 · 本机工作台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%23101d33'/%3E%3Cpath d='M41 14a20 20 0 1 0 9 33A22 22 0 0 1 41 14' fill='%239aafe9'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/vendor/leaflet.css"><link rel="stylesheet" href="/style.css"><script src="/vendor/leaflet.js" defer></script><script src="/vendor/coordtransform.js" defer></script><script src="/app.js" defer></script><script src="/map.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#accounts"><span class="brand-mark">☾</span><span><strong>晚安成电</strong><small>GOODNIGHT / LOCAL</small></span></a>
+    <div class="nav-label">每日签到</div>
+    <nav aria-label="主导航">
+      <a href="#accounts" data-nav="accounts"><span data-icon="account"></span>签到计划<span class="nav-count" id="nav-count">0</span></a>
+      <a href="#activity" data-nav="activity"><span data-icon="history"></span>运行记录</a>
+      <a href="/manual" rel="noopener"><span data-icon="grid"></span>使用指南</a>
+    </nav>
+    <div class="sidebar-bottom"><div><span class="live-dot"></span> 数据只保存在你的电脑</div><p>以学校保存的记录为准</p><small>GoodNight · v0.3.0</small></div>
+  </aside>
+  <div class="shell">
+    <header class="topbar"><div class="breadcrumb"><span>晚安成电</span><b>/</b><strong id="page-name">签到计划</strong></div><div class="topbar-right"><time id="clock"></time><span class="local-pill" id="connection-state"><i></i> 本机运行</span><span class="avatar" id="avatar">同</span></div></header>
+    <main id="main" tabindex="-1"><div class="loading">正在连接本机服务…</div></main>
+    <footer><span>☾ &nbsp;晚安成电 · 本机工作台</span><span>北京时间调度 · 配置与登录状态独立保存</span></footer>
+  </div>
+  <dialog id="editor" aria-labelledby="editor-title"><form id="account-form"><div class="dialog-head"><div><span class="eyebrow">ACCOUNT CONFIGURATION</span><h2 id="editor-title">添加打卡账号</h2></div><button class="icon-button" type="button" data-close="editor" aria-label="关闭">×</button></div><div class="dialog-body">
+    <input type="hidden" name="id"><label>账号名称<input name="name" required maxlength="40" placeholder="例如：我的学校账号" autocomplete="off"></label>
+    <div class="section-label">位置配置 <span>GCJ-02 坐标系</span></div>
+    <label>定位方式<select name="locationMode"><option value="real">设备定位 · 签到 / 报告</option><option value="virtual">虚拟位置 · 仅签到</option></select></label>
+    <div id="virtual-fields"><label>地点名称（可选）<input name="locationName" maxlength="60" placeholder="例如：欣苑组团"></label><button type="button" class="button map-launch full" id="open-map">地图选点 <span>点击地图或拖动标记 →</span></button><div class="field-row"><label>纬度<input name="latitude" type="number" min="-90" max="90" step="any" placeholder="30.674521"></label><label>经度<input name="longitude" type="number" min="-180" max="180" step="any" placeholder="104.096295"></label><label class="accuracy-field">精度（米）<input name="accuracy" type="number" min="0" max="200" step="any" value="20"></label></div><p class="hint">手动填写须使用 GCJ-02；地图选点会自动转换为 GCJ-02。签到点须在学校下发的有效范围内。</p></div>
+    <button type="button" class="button subtle full" id="load-locations">读取学校可用签到点 <span>→</span></button><div id="location-options" class="location-options"></div>
+    <div class="section-label">每日计划 <span>北京时间 · Asia/Shanghai</span></div><div class="field-row"><label>开始时间<input type="time" name="reportTime" required value="21:00"></label><label>截止时间<input type="time" name="recoveryCutoff" required value="23:00"></label></div><p class="hint">从开始时间尝试，截止前补跑；同时受学校实际开放时段限制。不会跨天补签。</p>
+    <details><summary>浏览器与报告设置</summary><label>浏览器<select name="browserChannel"><option value="chrome">Google Chrome</option><option value="msedge">Microsoft Edge</option><option value="chromium">Playwright Chromium</option></select></label><label>报告位置类型<select name="locationType"><option value="OUTSIDE">校外</option><option value="CAMPUS">校内</option></select></label><label>情况关键词<input name="keyword" required value="旅游"></label><label>报告说明<textarea name="remark" rows="2" minlength="10" maxlength="200" required></textarea></label><p class="hint">设备定位模式下，签到不可行时可能提交报告。请按实际情况填写。虚拟位置模式不提交报告。</p></details>
+    <p class="form-error" id="form-error" role="alert"></p>
+  </div><div class="dialog-foot"><span>新账号保存后，先登录并试运行</span><button type="button" class="button subtle" data-close="editor">取消</button><button class="button primary" type="submit">保存配置</button></div></form></dialog>
+  <dialog id="login-dialog" aria-labelledby="login-title"><div class="dialog-head"><div><span class="eyebrow">SCHOOL AUTHENTICATION</span><h2 id="login-title">登录学校账号</h2></div><button class="icon-button" data-action="cancel-login" aria-label="关闭">×</button></div><div class="dialog-body"><div class="login-art">☾<span>↗</span></div><h3>在新打开的浏览器中完成登录</h3><p class="muted">完成学校统一认证后，点击「晚安成电」，再回到这里验证。验证码与手机确认由你本人完成。</p><div class="notice">登录使用此账号独立的浏览器配置；不会读取你日常浏览器的 Cookie。窗口会在 10 分钟后自动关闭。</div><p class="form-error" id="login-error" role="alert"></p></div><div class="dialog-foot"><button class="button subtle" data-action="cancel-login">取消登录</button><button class="button primary" data-action="finish-login">我已登录，验证状态</button></div></dialog>
+  <dialog id="map-dialog" aria-labelledby="map-title"><div class="dialog-head"><div><span class="eyebrow">PICK A PLACE</span><h2 id="map-title">在地图上选择位置</h2></div><button class="icon-button" data-close="map-dialog" aria-label="关闭地图">×</button></div><div class="map-toolbar"><span>点击地图放置标记，拖动微调。滚轮或 ＋/− 缩放。</span><button class="button small subtle" id="map-reset">定位到当前坐标</button></div><div class="map-source"><label>地图来源<select id="map-provider"><option value="baidu">百度地图 · 国内</option><option value="osm">OpenStreetMap · 备用</option></select></label><label>百度浏览器 AK<input id="baidu-ak" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="首次使用填入你申请的浏览器端 AK"></label><button type="button" class="button small primary" id="map-connect">加载地图</button><a href="https://lbsyun.baidu.com/docs/jsapi?title=jspopular3.0%2Fguide%2Fgetkey" target="_blank" rel="noopener noreferrer">免费申请 AK ↗</a></div><div id="location-map" aria-label="位置选择地图"></div><div class="map-readout"><strong id="map-coordinate">尚未选点</strong><p id="map-status" role="status">优先使用百度地图；浏览器 AK 只保存在这台电脑。地图选点会转换为 GCJ-02。</p><label>地点名称<input id="map-name" maxlength="60" placeholder="给这个位置起个名字（可选）"></label></div><div class="dialog-foot"><span>选点只更新表单，保存配置后生效</span><button class="button subtle" data-close="map-dialog">取消</button><button class="button primary" id="map-apply" disabled>使用此位置</button></div></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body></html>

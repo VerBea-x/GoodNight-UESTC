@@ -1,4 +1,5 @@
 node_modules/
+dist/
 coverage/
 .DS_Store
 .env
@@ -24,3 +25,11 @@ run.lock
 submission-*.json
 scheduler.json
 last-session.json
+io.github.beichenO2.goodnight.vbs
+android/.sdk/
+android/.gradle/
+android/app/build/
+android/build/
+android-build-tools.zip
+gradle-8.13-bin.zip
+gradle-8.13/

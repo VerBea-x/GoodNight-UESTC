@@ -83,6 +83,8 @@ export async function runDaily({ config, store, dryRun=false, now=()=>new Date()
       }
     }
     // No valid dorm location / checkin window ended / explicit rejection: use the form.
+    // Virtual mode is for check-in only; do not submit a report about an assumed location.
+    if (config.locationMode === 'virtual') return { result:'location_fail', reason:'virtual_checkin_unavailable', submitted };
     const finalReportWindow=reportWindow(await adapter.getSchedule(),date,now());
     if(finalReportWindow.result!=='open')return {...finalReportWindow,submitted};
     let actualType;try{actualType=locationType(geo,await adapter.getFences());}catch(e){if(e.code==='need_login')throw e;return {result:'location_fail',reason:'campus_fences_invalid',submitted};}
@@ -120,7 +122,7 @@ export async function inspect({config,store,mode='check',open=launchBrowser,adap
     if(mode==='preflight') {
       let geo;try {geo=await adapter.getLocation();}catch(e){return {result:e.code==='need_login'?'need_login':'location_fail',reason:'location_unavailable_or_frontend_changed'};}
       if(!Number.isFinite(geo?.accuracy)||geo.accuracy<0||geo.accuracy>config.maxAccuracyMeters)return {result:'location_fail',reason:'accuracy_insufficient'};
-      return {result:'preflight_ready',accuracyMeter:Math.round(geo.accuracy)};
+      return {result:'preflight_ready',locationMode:config.locationMode || 'real',accuracyMeter:Math.round(geo.accuracy)};
     }
     const r=await adapter.getToday();if(!apiSucceeded(r)||!r.data)return {result:'unknown',reason:'today_unavailable'};
     return {result:'record_read',...summary(r),locationType:r.data.reportedLocationTypeCode,keywordMatches:r.data.caseKeyword===config.keyword,remarkMatches:r.data.caseRemark===config.remark};
