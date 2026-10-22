@@ -24,3 +24,11 @@ run.lock
 submission-*.json
 scheduler.json
 last-session.json
+android/.sdk/
+android/.gradle/
+android/app/build/
+android/build/
+gradle-8.13/
+dist/
+*.zip
+*.vbs
