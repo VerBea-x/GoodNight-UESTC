@@ -1,14 +1,13 @@
 package io.github.beicheno2.goodnight;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
 final class Config {
     static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
-    static SharedPreferences prefs(Context c) { return c.getSharedPreferences("goodnight", Context.MODE_PRIVATE); }
+    static SecurePrefs prefs(Context c) { return new SecurePrefs(c); }
     static LocalTime time(Context c, String key, String fallback) {
         try { return LocalTime.parse(prefs(c).getString(key, fallback)); } catch (Exception e) { return LocalTime.parse(fallback); }
     }
@@ -17,7 +16,7 @@ final class Config {
         return !now.isBefore(time(c,"start","21:00")) && now.isBefore(time(c,"end","23:00"));
     }
     static boolean valid(Context c) {
-        SharedPreferences p=prefs(c);
+        SecurePrefs p=prefs(c);
         double lat=Double.longBitsToDouble(p.getLong("lat",Double.doubleToRawLongBits(Double.NaN)));
         double lng=Double.longBitsToDouble(p.getLong("lng",Double.doubleToRawLongBits(Double.NaN)));
         return Double.isFinite(lat)&&Double.isFinite(lng)&&lat>=-90&&lat<=90&&lng>=-180&&lng<=180&&time(c,"start","21:00").isBefore(time(c,"end","23:00"));

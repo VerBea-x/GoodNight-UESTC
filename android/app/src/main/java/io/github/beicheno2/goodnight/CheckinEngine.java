@@ -1,7 +1,6 @@
 package io.github.beicheno2.goodnight;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -12,7 +11,7 @@ import org.json.JSONObject;
 
 final class CheckinEngine {
     private final Context context;
-    private final SharedPreferences prefs;
+    private final SecurePrefs prefs;
     private final SchoolApi api;
     CheckinEngine(Context c){context=c;prefs=Config.prefs(c);api=new SchoolApi(c);}
     static final class Result {

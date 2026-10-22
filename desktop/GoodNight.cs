@@ -63,7 +63,7 @@ internal static class GoodNight
             if (!Directory.Exists(from)) throw new Exception("缺少 " + folder + "，请重新解压完整安装包。");
             CopyDirectory(from, Path.Combine(target, folder));
         }
-        foreach (string file in new[] { "GoodNight.exe", "package.json", "LICENSE" })
+        foreach (string file in new[] { "GoodNight.exe", "package.json", "LICENSE", "DISCLAIMER.md" })
         {
             string from = Path.Combine(source, file);
             if (File.Exists(from)) File.Copy(from, Path.Combine(target, file), true);

@@ -1,6 +1,6 @@
 import os from 'node:os';
 import path from 'node:path';
-import fs from 'node:fs';
+import { Store } from './store.mjs';
 export const DEFAULT_REASON = '在校外旅游会注意自己安全，导员放心';
 export const DEFAULTS = Object.freeze({ version: 1, remark: DEFAULT_REASON, keyword: '旅游', locationType: 'OUTSIDE', reportTime: '22:30', sessionIntervalMinutes: 10, catchUpMinutes: 30, browserChannel: 'chrome', headless: true, frontendLocationExport: 'auto', maxAccuracyMeters: 200, preflightLeadMinutes: 20, recoveryIntervalMinutes: 10, recoveryCutoff: '23:55', notifications: true, locationMode: 'real', virtualLocation: null });
 export function defaultDataDir({ platform = process.platform, home = os.homedir(), env = process.env } = {}) {
@@ -44,7 +44,7 @@ export function validateConfig(input) {
 }
 export function loadConfig(dataDir) {
   let input;
-  try { input = JSON.parse(fs.readFileSync(path.join(dataDir, 'config.json'), 'utf8')); }
+  try { input = new Store(dataDir).read('config.json'); }
   catch (e) { if (e.code === 'ENOENT') throw new Error('尚未配置，请先运行 init'); throw new Error('无法读取 config.json，请检查 JSON 格式和权限'); }
   return validateConfig(input);
 }

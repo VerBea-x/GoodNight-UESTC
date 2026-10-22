@@ -64,6 +64,8 @@ OpenStreetMap 备用地图使用本地安装的 Leaflet 和 coordtransform，无
 
 网页账号索引在默认数据目录的 `web-accounts.json`，新增账号配置、profile、日志在 `accounts/<随机ID>/`。原 CLI 账号仍使用原数据目录。所有这些文件都在仓库外，请勿随源码分享。
 
+Windows 上，应用管理的 JSON 配置、账号索引、运行状态及日志会用当前用户的 DPAPI 密钥和 AES-256-GCM 加密；旧文件在首次打开相应数据目录时迁移。浏览器 profile 由 Chromium 与 Windows 自身管理，应用不会替浏览器加密所有缓存或本地存储。不要删除数据目录内的 `.goodnight-key`；如需覆盖全部离线数据，建议开启 Windows 设备加密或 BitLocker。
+
 API 校验 Host、Origin 和每次服务启动生成的请求令牌，限制跨站修改；没有开放跨域访问。它是个人电脑的本机控制台，无法阻止已在同一电脑上运行的恶意程序读取用户文件，不能作为公网服务直接暴露。
 
 源码包含离线 API 与隔离测试。真实系统服务、学校认证、定位和提交是否可用仍需按部署设备验证；Windows 本机已测试的行为以实际运行记录为准。

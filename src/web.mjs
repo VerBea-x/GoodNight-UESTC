@@ -18,6 +18,7 @@ Object.assign(files, {
   '/map.js':['map.js','text/javascript; charset=utf-8'],
   '/manual':['manual.html','text/html; charset=utf-8'],
   '/manual.css':['manual.css','text/css; charset=utf-8'],
+  '/disclaimer':['disclaimer.html','text/html; charset=utf-8'],
   '/vendor/leaflet.js':['../node_modules/leaflet/dist/leaflet.js','text/javascript; charset=utf-8'],
   '/vendor/leaflet.css':['../node_modules/leaflet/dist/leaflet.css','text/css; charset=utf-8'],
   '/vendor/coordtransform.js':['../node_modules/coordtransform/index.js','text/javascript; charset=utf-8']

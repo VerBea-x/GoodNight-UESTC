@@ -12,7 +12,7 @@ if (Test-Path -LiteralPath $output) {
 }
 New-Item -ItemType Directory -Path $output | Out-Null
 foreach ($folder in @('bin','src','web','node_modules')) { Copy-Item -LiteralPath (Join-Path $root $folder) -Destination (Join-Path $output $folder) -Recurse }
-foreach ($file in @('package.json','LICENSE')) { Copy-Item -LiteralPath (Join-Path $root $file) -Destination (Join-Path $output $file) }
+foreach ($file in @('package.json','LICENSE','DISCLAIMER.md')) { Copy-Item -LiteralPath (Join-Path $root $file) -Destination (Join-Path $output $file) }
 Copy-Item -LiteralPath (Join-Path $root 'docs\pc.md') -Destination (Join-Path $output 'README-PC.md')
 $exe = Join-Path $output 'GoodNight.exe'
 $sourceFile = Join-Path $root 'desktop\GoodNight.cs'
