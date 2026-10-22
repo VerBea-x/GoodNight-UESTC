@@ -13,6 +13,7 @@ final class CheckinEngine {
     private final Context context;
     private final SecurePrefs prefs;
     private final SchoolApi api;
+    private boolean recordHistory;
     CheckinEngine(Context c){context=c;prefs=Config.prefs(c);api=new SchoolApi(c);}
     static final class Result {
         final String code, detail;
@@ -21,7 +22,7 @@ final class CheckinEngine {
     }
     private Result result(String code,String detail){
         prefs.edit().putString("last_status",code).putString("last_detail",detail).putLong("last_at",System.currentTimeMillis()).apply();
-        try{long now=System.currentTimeMillis(),cutoff=now-30L*24*60*60*1000;String today=java.time.Instant.ofEpochMilli(now).atZone(Config.ZONE).toLocalDate().toString();JSONArray history=new JSONArray(prefs.getString("history","[]"));JSONObject item=new JSONObject();item.put("at",now);item.put("code",code);item.put("detail",detail);JSONArray next=new JSONArray();next.put(item);for(int i=0;i<history.length();i++){JSONObject old=history.optJSONObject(i);if(old==null)continue;long at=old.optLong("at",0);if(at>=cutoff||java.time.Instant.ofEpochMilli(at).atZone(Config.ZONE).toLocalDate().toString().equals(today))next.put(old);}prefs.edit().putString("history",next.toString()).apply();}catch(Exception ignored){}
+        if(recordHistory)try{long now=System.currentTimeMillis(),cutoff=now-30L*24*60*60*1000;String today=java.time.Instant.ofEpochMilli(now).atZone(Config.ZONE).toLocalDate().toString();JSONArray history=new JSONArray(prefs.getString("history","[]"));JSONObject item=new JSONObject();item.put("at",now);item.put("code",code);item.put("detail",detail);JSONArray next=new JSONArray();next.put(item);for(int i=0;i<history.length();i++){JSONObject old=history.optJSONObject(i);if(old==null)continue;long at=old.optLong("at",0);if(at>=cutoff||java.time.Instant.ofEpochMilli(at).atZone(Config.ZONE).toLocalDate().toString().equals(today))next.put(old);}prefs.edit().putString("history",next.toString()).apply();}catch(Exception ignored){}
         return new Result(code,detail);
     }
     private static double distance(double a,double b,double c,double d){
@@ -31,6 +32,7 @@ final class CheckinEngine {
     }
     Result run(boolean submit){
         synchronized(CheckinEngine.class){
+            recordHistory=submit;
             try{return perform(submit);}catch(Exception e){String m=e.getMessage();return result("need_login".equals(m)?"need_login":"error","need_login".equals(m)?"应用内尚未取得学校登录会话。请在“查看学校页面”中完成登录并进入“晚安成电”，再重试只读检查。":m==null?"运行失败":m);}
         }
     }

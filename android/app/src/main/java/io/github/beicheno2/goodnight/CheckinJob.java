@@ -11,6 +11,7 @@ import android.app.job.JobService;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -40,24 +41,33 @@ public final class CheckinJob extends JobService {
     }
     @Override public boolean onStartJob(JobParameters params){
         new Thread(()->{
-            CheckinEngine.Result result=new CheckinEngine(this).run(true);
-            boolean terminal=result.finalToday();
-            if(!result.code.equals("waiting"))notifyUser(result);
-            if(terminal){Config.prefs(this).edit().putString("last_terminal_date",ZonedDateTime.now(Config.ZONE).toLocalDate().toString()).apply();}
-            schedule(this,!terminal);
-            jobFinished(params,false);
+            try{
+                CheckinEngine.Result result=new CheckinEngine(this).run(true);
+                boolean terminal=result.finalToday();
+                if(!result.code.equals("waiting"))notifyUser(result);
+                if(terminal)Config.prefs(this).edit().putString("last_terminal_date",ZonedDateTime.now(Config.ZONE).toLocalDate().toString()).apply();
+                schedule(this,!terminal);
+            }catch(Exception error){
+                Config.prefs(this).edit().putString("notification_status","任务运行异常，请查看签到记录").apply();
+            }finally{jobFinished(params,false);}
         },"goodnight-checkin").start();
         return true;
     }
     @Override public boolean onStopJob(JobParameters params){return true;}
     private void notifyUser(CheckinEngine.Result r){
         NotificationManager manager=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
+        if(manager==null||!manager.areNotificationsEnabled()||(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)){
+            Config.prefs(this).edit().putString("notification_status","通知权限未开启").apply();return;
+        }
         manager.createNotificationChannel(new NotificationChannel("checkin","签到结果",NotificationManager.IMPORTANCE_DEFAULT));
+        NotificationChannel channel=manager.getNotificationChannel("checkin");
+        if(channel==null||channel.getImportance()==NotificationManager.IMPORTANCE_NONE){Config.prefs(this).edit().putString("notification_status","签到结果通知渠道已关闭").apply();return;}
         PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
         String title=r.code.equals("success")||r.code.equals("already_done")?"晚安成电 · 今日记录已确认":"晚安成电 · 请查看签到结果";
         Notification notification=new Notification.Builder(this,"checkin").setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title).setContentText(r.detail).setStyle(new Notification.BigTextStyle().bigText(r.detail))
             .setAutoCancel(true).setContentIntent(open).build();
-        try{manager.notify(294,notification);}catch(SecurityException ignored){}
+        try{manager.notify(294,notification);Config.prefs(this).edit().putString("notification_status","已发送通知").apply();}
+        catch(SecurityException error){Config.prefs(this).edit().putString("notification_status","通知权限未开启").apply();}
     }
 }
