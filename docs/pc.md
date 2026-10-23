@@ -4,6 +4,8 @@
 
 ## 安装与打开
 
+如果 Release 已提供 GoodNight-PC.zip，可直接下载。自行构建时先安装 Node.js 22+，在项目目录依次运行 `npm ci` 和 `powershell -NoProfile -ExecutionPolicy Bypass -File .\build-pc.ps1`，生成安装包位于 dist/。
+
 1. Windows 电脑需已安装 Microsoft Edge，以及 Node.js 22 或更新版本。首次安装需要 Node.js；应用随后将它复制到自己的固定目录。
 2. 解压完整的 `GoodNight-PC.zip`，双击 `GoodNight.exe`。不要只复制 exe 文件。
 3. 第一次启动会复制应用到当前用户的 `%LOCALAPPDATA%\Programs\GoodNight`，注册登录后启动的后台任务，并在开始菜单建立“晚安成电”入口。此后可删除解压目录，通过开始菜单打开。

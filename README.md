@@ -4,7 +4,7 @@
 
 [完整文档导航](docs/index.md) · [常见问题](docs/faq.md) · [APK 发布指南](docs/releases.md)
 
-当前 Android 版本为 **0.6.6**。安装包见仓库的 [Releases](https://github.com/VerBea-x/GoodNight-UESTC/releases)（仅已发布版本可下载）；如列表为空，请按下文从源码构建。Android 更新请覆盖安装，保留本机加密设置和登录状态。
+Android 当前预发布版本为 **0.6.6**。从 [Releases](https://github.com/VerBea-x/GoodNight-UESTC/releases) 下载对应版本的 APK；安装前阅读该版本的说明。升级请覆盖安装，保留本机设置和登录状态。
 
 面向电子科技大学「晚安成电」的本机签到工具。Windows 版提供桌面窗口和本机网页配置；Android 版可在手机上独立运行。用户自行登录学校系统、设置签到时间与 GCJ-02 坐标，程序在设定时段内尝试签到，并读取学校保存的记录供核对。学校记录是最终结果，自动任务可能受网络、登录状态和系统省电影响。
 
@@ -12,7 +12,7 @@
 
 ### Windows 桌面版
 
-安装 Node.js 22+ 与 Microsoft Edge。下载源码，在项目目录运行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\build-pc.ps1`，解压生成的 `dist/GoodNight-PC.zip`，双击其中的 `GoodNight.exe`。首次启动会安装到当前用户目录并创建开始菜单入口；以后无需保持终端窗口打开。详见 [Windows 使用指南](docs/pc.md)。
+安装 Node.js 22+ 与 Microsoft Edge。下载源码，运行 `npm ci`，再运行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\build-pc.ps1`。解压生成的 `dist/GoodNight-PC.zip`，双击其中的 `GoodNight.exe`。首次启动会安装并创建开始菜单入口。详见 [Windows 使用指南](docs/pc.md)。
 
 ### 本机网页版
 
@@ -20,7 +20,15 @@
 
 ### Android 独立版
 
-下载或自行构建 APK，打开应用，粘贴电脑端复制的账号配置，完成手机上的学校登录，核对坐标与时间，然后开启自动签到。手机不依赖电脑持续运行。构建命令为 `build-android.cmd`，生成文件为 `dist/GoodNight-Android-debug.apk`。手机端不提供地图选点；可在电脑端选点后复制配置，或手动填写 GCJ-02 坐标。详见 [Android 使用指南](docs/android.md)。
+最低支持 Android 8.0。
+
+1. 从 Release 的 Assets 下载 APK 并安装。Source code 压缩包是源码，不能直接安装。
+2. 打开“学校登录”，完成认证并进入“晚安成电”。
+3. 点击“粘贴配置”导入电脑端复制的设置，或手动填写 GCJ-02 经纬度及签到时段。
+4. 允许通知，开启“自动签到”，等待顶部显示计划已开启。
+5. 收到结果提醒后，在学校页面核对当天记录。
+
+手机可独立运行，无需电脑保持在线。手机端没有地图；选点可在电脑端完成。详见 [Android 使用指南](docs/android.md)。
 
 `dist/` 是本机生成目录，不提交到 Git。发布安装包时应作为 GitHub Release 附件上传；源码以仓库文件为准。
 
@@ -32,8 +40,7 @@ Release 标签和 APK 版本应一致。当前源码为 0.6.6，已发布下载�
 - Android 端支持粘贴配置、学校登录、签到时间与位置、后台计划、结果通知和记录查看。应用仅把配置坐标用于本应用的签到请求，不修改手机系统定位。
 - 虚拟坐标模式只尝试签到，不自动提交校外报告。位置必须符合学校当前有效范围；配置坐标不保证学校接受。
 - 自动签到与结果读取依赖当前学校页面和接口。登录过期、学校服务变化、手机省电策略、关机或断网都可能使计划延迟或失败。请在学校系统核对当天结果。
-- Android v0.6.2 修复后台任务注册所需的网络状态权限；真实手机上的后台唤醒和签到仍应以安装后的运行记录核验。
-- Android v0.6.4 可在应用内阅读免责声明、手动清除全部本机签到历史；设置与运行记录由 Android Keystore 密钥加密。自动任务完成尝试后会通过系统通知提醒，需允许通知权限。Windows 的配置、账号索引、运行状态和日志使用当前用户的 Windows DPAPI 密钥配合 AES-256-GCM 加密。
+- 可在应用内阅读免责声明、清除本机签到历史。具体版本变更见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 本机数据保护
 

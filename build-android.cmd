@@ -1,7 +1,6 @@
 @echo off
 setlocal
 set "ROOT=%~dp0"
-if not defined JAVA_HOME if exist "D:\Java17\jdk17.0.19_10\bin\java.exe" set "JAVA_HOME=D:\Java17\jdk17.0.19_10"
 if not exist "%JAVA_HOME%\bin\java.exe" (
   echo JDK 17 is required. Set JAVA_HOME and try again.
   pause

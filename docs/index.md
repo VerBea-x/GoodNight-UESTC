@@ -10,4 +10,4 @@
 - [隐私与安全反馈](../SECURITY.md)
 - [本项目免责声明](../DISCLAIMER.md)
 
-架构、定位契约与早期故障分析见 architecture.md、source-audit.md、incidents/。这些文件记录具体实现或历史观察，不代表当前安装包已通过全部平台的真实签到验证。
+开发目录与运行结构见 [项目结构](architecture.md)。
