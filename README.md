@@ -2,7 +2,7 @@
 
 [项目仓库](https://github.com/VerBea-x/GoodNight-UESTC) · [版本记录](CHANGELOG.md) · [安卓指南](docs/android.md) · [Windows 指南](docs/pc.md) · [问题反馈](https://github.com/VerBea-x/GoodNight-UESTC/issues)
 
-当前 Android 版本为 **0.6.5**。安装包见仓库的 [Releases](https://github.com/VerBea-x/GoodNight-UESTC/releases)（仅已发布版本可下载）；如列表为空，请按下文从源码构建。Android 更新请覆盖安装，保留本机加密设置和登录状态。
+当前 Android 版本为 **0.6.6**。安装包见仓库的 [Releases](https://github.com/VerBea-x/GoodNight-UESTC/releases)（仅已发布版本可下载）；如列表为空，请按下文从源码构建。Android 更新请覆盖安装，保留本机加密设置和登录状态。
 
 面向电子科技大学「晚安成电」的本机签到工具。Windows 版提供桌面窗口和本机网页配置；Android 版可在手机上独立运行。用户自行登录学校系统、设置签到时间与 GCJ-02 坐标，程序在设定时段内尝试签到，并读取学校保存的记录供核对。学校记录是最终结果，自动任务可能受网络、登录状态和系统省电影响。
 

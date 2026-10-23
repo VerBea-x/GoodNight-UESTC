@@ -45,6 +45,16 @@ public final class MainActivity extends Activity {
     private TextView status,summary;
     private LocalTime startTime,endTime;
     private boolean running;
+    private static final java.util.concurrent.ExecutorService PLAN_WRITES=java.util.concurrent.Executors.newSingleThreadExecutor();
+    private volatile int planRevision;
+    private int refreshRevision;
+    private Boolean pendingPlan;
+    private String lastWhen="尚未运行",notificationText="";
+    private boolean displayedPlan;
+    private void showPlanSummary(){
+        String plan=pendingPlan==null?(displayedPlan?"自动计划已开启":"自动计划未开启"):(pendingPlan?"正在开启自动计划…":"正在关闭自动计划…");
+        summary.setText(lastWhen+" · "+plan+" · "+startTime.format(CLOCK)+"–"+endTime.format(CLOCK)+(notificationText.isEmpty()?"":" · "+notificationText));
+    }
     private int dp(int n){return (int)(n*getResources().getDisplayMetrics().density);}
     private GradientDrawable background(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
     private RippleDrawable touchBackground(int color,int radius){return new RippleDrawable(ColorStateList.valueOf(0x33718799),background(color,radius),null);}
@@ -57,7 +67,20 @@ public final class MainActivity extends Activity {
     private void timeButton(LinearLayout parent,String label,LocalTime initial,boolean isStart){Button b=button(parent,label+"  "+initial.format(CLOCK),false,()->{});b.setOnClickListener(v->{LocalTime current=isStart?startTime:endTime;new TimePickerDialog(this,(picker,hour,minute)->{LocalTime chosen=LocalTime.of(hour,minute);if(isStart)startTime=chosen;else endTime=chosen;b.setText(label+"  "+chosen.format(CLOCK));},current.getHour(),current.getMinute(),true).show();});}
     @Override public void onCreate(Bundle state){super.onCreate(state);render();if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},12);}
     @Override protected void onResume(){super.onResume();refresh();updateSchoolStatus();}
-    private void updateSchoolStatus(){long now=System.currentTimeMillis();if(running||now-Config.prefs(this).getLong("last_auth_check",0)<60000)return;running=true;new Thread(()->{String detail;try{JSONObject auth=new SchoolApi(this).get("/auth/user-info");detail=SchoolApi.ok(auth)&&!auth.isNull("data")?"学校登录有效":"请在应用内登录学校账号";}catch(Exception e){detail="请在应用内登录学校账号";}final String shown=detail;Config.prefs(this).edit().putString("account_status",shown).putLong("last_auth_check",System.currentTimeMillis()).apply();runOnUiThread(()->{running=false;if(status!=null)status.setText(shown);});},"goodnight-auth-status").start();}
+    private void updateSchoolStatus(){
+        if(running)return;running=true;
+        new Thread(()->{
+            try{
+                if(System.currentTimeMillis()-Config.prefs(this).getLong("last_auth_check",0)<60000)return;
+                String detail;
+                try{JSONObject auth=new SchoolApi(this).get("/auth/user-info");detail=SchoolApi.ok(auth)&&!auth.isNull("data")?"学校登录有效":"请在应用内登录学校账号";}
+                catch(Exception error){detail="学校状态暂时无法确认，请查看学校页面";}
+                final String shown=detail;
+                Config.prefs(this).edit().putString("account_status",shown).putLong("last_auth_check",System.currentTimeMillis()).apply();
+                runOnUiThread(()->{if(!isDestroyed()&&status!=null)status.setText(shown);});
+            }finally{runOnUiThread(()->running=false);}
+        },"goodnight-auth-status").start();
+    }
     private void render(){
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(PALE);content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(16),dp(24),dp(16),dp(28));scroll.addView(content);setContentView(scroll);
         LinearLayout top=new LinearLayout(this);top.setOrientation(LinearLayout.HORIZONTAL);top.setGravity(Gravity.CENTER_VERTICAL);content.addView(top);
@@ -85,16 +108,23 @@ public final class MainActivity extends Activity {
         }catch(Exception error){Toast.makeText(this,"配置文字无效或不受支持",Toast.LENGTH_LONG).show();}}
     private void refresh(){
         if(status==null)return;
-        String code=Config.prefs(this).getString("last_status","");status.setText(Config.prefs(this).getString("account_status","正在检查学校登录…"));
-        long at=Config.prefs(this).getLong("last_at",0);String when=at>0?java.time.Instant.ofEpochMilli(at).atZone(Config.ZONE).format(DateTimeFormatter.ofPattern("M月d日 HH:mm")):"尚未运行";
-        String plan=Config.prefs(this).getBoolean("enabled",false)?"自动计划已开启":"自动计划未开启";
-        String notification=Config.prefs(this).getString("notification_status","");
-        summary.setText(when+" · "+plan+" · "+Config.time(this,"start","21:00").format(CLOCK)+"–"+Config.time(this,"end","23:00").format(CLOCK)+(notification.isEmpty()?"":" · "+notification));
-        boolean today=at>0&&java.time.Instant.ofEpochMilli(at).atZone(Config.ZONE).toLocalDate().equals(LocalDate.now(Config.ZONE));
-        boolean complete=today&&(code.equals("success")||code.equals("already_done"));
-        if(lat!=null&&Config.valid(this)&&!lat.hasFocus()&&!lng.hasFocus()){lat.setText(String.format(Locale.US,"%.6f",Config.latitude(this)));lng.setText(String.format(Locale.US,"%.6f",Config.longitude(this)));}
+        final int revision=++refreshRevision,plan=planRevision;
+        new Thread(()->{
+            try{
+                SecurePrefs prefs=Config.prefs(this);
+                String account=prefs.getString("account_status","正在检查学校登录…");
+                long at=prefs.getLong("last_at",0);
+                String when=at>0?java.time.Instant.ofEpochMilli(at).atZone(Config.ZONE).format(DateTimeFormatter.ofPattern("M月d日 HH:mm")):"尚未运行";
+                boolean enabled=prefs.getBoolean("enabled",false);
+                String notice=prefs.getString("notification_status","");
+                runOnUiThread(()->{
+                    if(isDestroyed()||revision!=refreshRevision||plan!=planRevision||pendingPlan!=null)return;
+                    status.setText(account);lastWhen=when;notificationText=notice;displayedPlan=enabled;setSwitch(enabled);showPlanSummary();
+                });
+            }catch(Exception error){runOnUiThread(()->{if(!isDestroyed()&&revision==refreshRevision&&pendingPlan==null)summary.setText("状态暂时无法读取，请重新打开应用");});}
+        },"goodnight-status-read").start();
     }
-    private void setSwitch(boolean checked){autoSwitch.setOnCheckedChangeListener(null);autoSwitch.setChecked(checked);autoSwitch.setOnCheckedChangeListener((view,value)->toggleAuto(value));}
+    private void setSwitch(boolean checked){if(autoSwitch.isChecked()==checked)return;autoSwitch.setOnCheckedChangeListener(null);autoSwitch.setChecked(checked);autoSwitch.setOnCheckedChangeListener((view,value)->toggleAuto(value));}
     private void toggleAuto(boolean checked){
         double a=0,b=0;
         if(checked){
@@ -106,9 +136,12 @@ public final class MainActivity extends Activity {
         }
         final double latitude=a,longitude=b;
         final String start=startTime.format(CLOCK),end=endTime.format(CLOCK);
-        // Let the switch animate immediately; durable encryption and IPC run off the UI thread.
-        autoSwitch.setEnabled(false);
-        new Thread(()->{
+        final int revision=++planRevision;
+        pendingPlan=checked;
+        showPlanSummary();
+        // Serialize writes while allowing the native switch animation and subsequent taps.
+        PLAN_WRITES.execute(()->{
+            if(revision!=planRevision)return;
             String failure=null;
             try{
                 SecurePrefs.Editor editor=Config.prefs(this).edit().putBoolean("enabled",checked);
@@ -120,7 +153,7 @@ public final class MainActivity extends Activity {
                 try{Config.prefs(this).edit().putBoolean("enabled",false).commit();CheckinJob.schedule(this,false);}catch(Exception ignored){}
             }
             final String message=failure;
-            runOnUiThread(()->{if(isDestroyed())return;if(message!=null){setSwitch(false);Toast.makeText(this,message,Toast.LENGTH_LONG).show();}autoSwitch.setEnabled(true);refresh();});
-        },"goodnight-plan-save").start();
+            runOnUiThread(()->{if(isDestroyed()||revision!=planRevision)return;pendingPlan=null;displayedPlan=message==null&&checked;if(message!=null){setSwitch(false);Toast.makeText(this,message,Toast.LENGTH_LONG).show();}showPlanSummary();refresh();});
+        });
     }
 }
