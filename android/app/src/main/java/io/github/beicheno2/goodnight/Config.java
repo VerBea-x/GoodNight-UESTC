@@ -7,7 +7,11 @@ import java.time.ZonedDateTime;
 
 final class Config {
     static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
-    static SecurePrefs prefs(Context c) { return new SecurePrefs(c); }
+    private static SecurePrefs cached;
+    static synchronized SecurePrefs prefs(Context c) {
+        if(cached==null)cached=new SecurePrefs(c.getApplicationContext());
+        return cached;
+    }
     static LocalTime time(Context c, String key, String fallback) {
         try { return LocalTime.parse(prefs(c).getString(key, fallback)); } catch (Exception e) { return LocalTime.parse(fallback); }
     }

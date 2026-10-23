@@ -94,13 +94,33 @@ public final class MainActivity extends Activity {
         boolean complete=today&&(code.equals("success")||code.equals("already_done"));
         if(lat!=null&&Config.valid(this)&&!lat.hasFocus()&&!lng.hasFocus()){lat.setText(String.format(Locale.US,"%.6f",Config.latitude(this)));lng.setText(String.format(Locale.US,"%.6f",Config.longitude(this)));}
     }
-    private void toggleAuto(boolean checked){if(!checked){Config.prefs(this).edit().putBoolean("enabled",false).apply();try{CheckinJob.schedule(this,false);}catch(Exception ignored){}refresh();return;}if(!save()){autoSwitch.setOnCheckedChangeListener(null);autoSwitch.setChecked(false);autoSwitch.setOnCheckedChangeListener((view,value)->toggleAuto(value));}}
-    private boolean save(){
-        double a,b;try{a=Double.parseDouble(lat.getText().toString().trim());b=Double.parseDouble(lng.getText().toString().trim());}catch(NumberFormatException e){Toast.makeText(this,"请填写有效的经纬度",Toast.LENGTH_LONG).show();return false;}
-        if(!Double.isFinite(a)||!Double.isFinite(b)||Math.abs(a)>90||Math.abs(b)>180){Toast.makeText(this,"经纬度超出范围",Toast.LENGTH_LONG).show();return false;}
-        if(startTime==null||endTime==null||!startTime.isBefore(endTime)){Toast.makeText(this,"截止时间须晚于开始时间",Toast.LENGTH_LONG).show();return false;}
-        Config.location(this,a,b);Config.prefs(this).edit().putString("start",startTime.format(CLOCK)).putString("end",endTime.format(CLOCK)).putBoolean("enabled",true).apply();
-        try{CheckinJob.schedule(this,false);}catch(Exception error){Config.prefs(this).edit().putBoolean("enabled",false).apply();String reason=error.getMessage();Toast.makeText(this,"定时任务启动失败"+(reason==null?"":"："+reason),Toast.LENGTH_LONG).show();return false;}
-        refresh();return true;
+    private void setSwitch(boolean checked){autoSwitch.setOnCheckedChangeListener(null);autoSwitch.setChecked(checked);autoSwitch.setOnCheckedChangeListener((view,value)->toggleAuto(value));}
+    private void toggleAuto(boolean checked){
+        double a=0,b=0;
+        if(checked){
+            try{a=Double.parseDouble(lat.getText().toString().trim());b=Double.parseDouble(lng.getText().toString().trim());}
+            catch(NumberFormatException error){setSwitch(false);Toast.makeText(this,"请填写有效的经纬度",Toast.LENGTH_LONG).show();return;}
+            if(!Double.isFinite(a)||!Double.isFinite(b)||Math.abs(a)>90||Math.abs(b)>180||startTime==null||endTime==null||!startTime.isBefore(endTime)){
+                setSwitch(false);Toast.makeText(this,"请检查经纬度和时间",Toast.LENGTH_LONG).show();return;
+            }
+        }
+        final double latitude=a,longitude=b;
+        final String start=startTime.format(CLOCK),end=endTime.format(CLOCK);
+        // Let the switch animate immediately; durable encryption and IPC run off the UI thread.
+        autoSwitch.setEnabled(false);
+        new Thread(()->{
+            String failure=null;
+            try{
+                SecurePrefs.Editor editor=Config.prefs(this).edit().putBoolean("enabled",checked);
+                if(checked)editor.putLong("lat",Double.doubleToRawLongBits(latitude)).putLong("lng",Double.doubleToRawLongBits(longitude)).putString("start",start).putString("end",end);
+                if(!editor.commit())throw new IllegalStateException("无法保存计划");
+                CheckinJob.schedule(this,false);
+            }catch(Exception error){
+                failure="计划更新失败，请重试";
+                try{Config.prefs(this).edit().putBoolean("enabled",false).commit();CheckinJob.schedule(this,false);}catch(Exception ignored){}
+            }
+            final String message=failure;
+            runOnUiThread(()->{if(isDestroyed())return;if(message!=null){setSwitch(false);Toast.makeText(this,message,Toast.LENGTH_LONG).show();}autoSwitch.setEnabled(true);refresh();});
+        },"goodnight-plan-save").start();
     }
 }

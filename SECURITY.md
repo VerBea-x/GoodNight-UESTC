@@ -1,15 +1,7 @@
-# Security policy
+# 隐私与安全
 
-## Reporting a vulnerability
+Android 设置和运行记录使用 Android Keystore 加密；Windows 应用 JSON 数据与日志使用 DPAPI 保护的 AES-256-GCM 密钥。浏览器资料由浏览器与操作系统管理，详见 README 的保护范围。
 
-Please do not post credentials, personal records, cookies, browser profiles, or exploitable details in a public issue. Contact the repository maintainers privately through the security reporting channel configured on the hosting platform. If no private channel is configured, ask a maintainer for a private contact route without including sensitive data in the request.
+请勿在公开 Issue 中提交凭证、Cookie、学校接口响应、个人坐标、用户数据目录或 .goodnight-key。加密不防止已经取得同一用户权限的恶意程序，也不替代设备锁屏和磁盘加密。
 
-## Sensitive data
-
-GoodNight stores browser and runtime state locally so it can use the user's authenticated session. Keep the data directory private. Never attach it, its logs, or its profile to an issue or pull request. The project does not need exported cookies; do not add cookie export or secret upload features.
-
-If check-in or a report may have been submitted but the client did not verify it, first inspect the school record with `check`. Separate local per-operation POST journals prevent blind automatic retries. In particular, an ambiguous check-in outcome must never be treated as a definitive rejection that permits report fallback. The journals cannot determine the server's final state while the school is unavailable.
-
-## Supported versions
-
-The project currently targets Node.js 22+ and macOS, Windows, and Linux. Live school behavior and platform authentication/location remain unverified for the new portable package; CI is offline only. Security reports are welcome for the CLI, dependencies, service installation/removal, local file handling, and authentication boundaries.
+如发现可能暴露个人信息的问题，请优先通过仓库 Security 页的私密漏洞报告入口反馈（如维护者已启用）。若入口不可用，可先提交仅说明需要私密联系的 Issue，不要公开漏洞细节或敏感样本。

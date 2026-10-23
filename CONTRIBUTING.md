@@ -1,22 +1,13 @@
-# Contributing
+# 参与开发
 
-Thanks for helping improve GoodNight. Keep changes deterministic, local-first, and specific to the supported UESTC flow unless you are deliberately proposing a separately scoped adapter.
+请先阅读 README、免责声明和对应平台的使用指南。项目保留原始 GoodNight 的提交历史及 MIT 许可证，引用来源请保留。
 
-## Before submitting
+## 本地开发
 
-1. Use Node.js 22 or later and install the lockfile dependencies with `npm ci`.
-2. Run `npm test`. These tests are offline and must use synthetic fixtures; do not make school requests in CI.
-3. Explain behavior changes and how you verified them. Distinguish offline tests from live school validation.
-4. Update the relevant documentation when changing CLI options, data paths, scheduling, submission, recovery, or platform behavior.
+Node.js 22+，先运行 npm ci；npm run web 启动本机控制台。npm test 运行 Node 离线测试。Android 使用 JDK 17、Gradle 8.13 和 Android SDK 35 构建，具体见 docs/android.md。
 
-## Privacy and safety
+提交应说明触发问题的操作、改动后的行为和验证范围。测试学校服务时避免重复提交真实考勤；优先使用只读检查或试运行。新功能默认不要打开自动计划。
 
-Never commit credentials, cookies, browser profiles, storage state, real report text, student records, private logs, or screenshots containing personal data. Keep all runtime data in the ignored user data directory. Do not add code that fabricates location or treats an unverified submission as success. Do not add scheduled GitHub Actions that submit reports or recommend cloud/Docker execution for live reporting, which depends on real location and user-driven display login.
+## 报告问题
 
-## Changes to school integration
-
-School pages and APIs can change. Preserve fail-closed behavior when options, location integration, submission responses, or saved-record verification do not match expectations. Do not silently repair upstream changes using an LLM. Include the source and audit date for externally verified integration assumptions without publishing private account data.
-
-## Pull requests
-
-Keep pull requests focused. Include a concise description, user-visible behavior, validation performed, and any unverified platform or school-side assumptions. Do not claim cross-platform or school E2E support based only on offline CI.
+请提供应用版本、系统版本、复现步骤和经过遮挡的错误信息。不要上传学号、学校密码、Cookie、坐标配置、加密密钥或完整浏览器资料。安装包与构建工具不提交到源码仓库。

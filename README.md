@@ -1,5 +1,9 @@
 # 晚安成电 · GoodNight
 
+[项目仓库](https://github.com/VerBea-x/GoodNight-UESTC) · [版本记录](CHANGELOG.md) · [安卓指南](docs/android.md) · [Windows 指南](docs/pc.md) · [问题反馈](https://github.com/VerBea-x/GoodNight-UESTC/issues)
+
+当前 Android 版本为 **0.6.5**。安装包见仓库的 [Releases](https://github.com/VerBea-x/GoodNight-UESTC/releases)（仅已发布版本可下载）；如列表为空，请按下文从源码构建。Android 更新请覆盖安装，保留本机加密设置和登录状态。
+
 面向电子科技大学「晚安成电」的本机签到工具。Windows 版提供桌面窗口和本机网页配置；Android 版可在手机上独立运行。用户自行登录学校系统、设置签到时间与 GCJ-02 坐标，程序在设定时段内尝试签到，并读取学校保存的记录供核对。学校记录是最终结果，自动任务可能受网络、登录状态和系统省电影响。
 
 ## 开始使用
@@ -38,5 +42,16 @@ Windows 版首次读取旧 JSON 数据时会在原用户目录内完成加密迁
 使用前请阅读[本项目免责声明](DISCLAIMER.md)。请遵守学校规定，仅处理自己有权操作的账号，妥善保管登录数据，并以学校保存的记录为准。
 
 ## 从源码开发
+
+下载当前项目：
+
+```sh
+git clone https://github.com/VerBea-x/GoodNight-UESTC.git
+cd GoodNight-UESTC
+npm ci
+npm run web
+```
+
+开发贡献见 [CONTRIBUTING.md](CONTRIBUTING.md)，隐私与漏洞反馈见 [SECURITY.md](SECURITY.md)。
 
 Node.js 22+：`npm ci`。命令行入口为 `node bin/goodnight.mjs`；常用命令有 `login`、`check`、`run --dry-run`、`daemon`。Android 构建需要 JDK 17、Android SDK Platform 35、Build Tools 35.0.0 和 Gradle 8.13。详细设计见 [架构说明](docs/architecture.md)。配置、浏览器会话和运行日志保存在用户数据目录，切勿提交到 Git 或与他人分享。
