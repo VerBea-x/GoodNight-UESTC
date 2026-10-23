@@ -2,6 +2,8 @@
 
 [项目仓库](https://github.com/VerBea-x/GoodNight-UESTC) · [版本记录](CHANGELOG.md) · [安卓指南](docs/android.md) · [Windows 指南](docs/pc.md) · [问题反馈](https://github.com/VerBea-x/GoodNight-UESTC/issues)
 
+[完整文档导航](docs/index.md) · [常见问题](docs/faq.md) · [APK 发布指南](docs/releases.md)
+
 当前 Android 版本为 **0.6.6**。安装包见仓库的 [Releases](https://github.com/VerBea-x/GoodNight-UESTC/releases)（仅已发布版本可下载）；如列表为空，请按下文从源码构建。Android 更新请覆盖安装，保留本机加密设置和登录状态。
 
 面向电子科技大学「晚安成电」的本机签到工具。Windows 版提供桌面窗口和本机网页配置；Android 版可在手机上独立运行。用户自行登录学校系统、设置签到时间与 GCJ-02 坐标，程序在设定时段内尝试签到，并读取学校保存的记录供核对。学校记录是最终结果，自动任务可能受网络、登录状态和系统省电影响。
@@ -21,6 +23,8 @@
 下载或自行构建 APK，打开应用，粘贴电脑端复制的账号配置，完成手机上的学校登录，核对坐标与时间，然后开启自动签到。手机不依赖电脑持续运行。构建命令为 `build-android.cmd`，生成文件为 `dist/GoodNight-Android-debug.apk`。手机端不提供地图选点；可在电脑端选点后复制配置，或手动填写 GCJ-02 坐标。详见 [Android 使用指南](docs/android.md)。
 
 `dist/` 是本机生成目录，不提交到 Git。发布安装包时应作为 GitHub Release 附件上传；源码以仓库文件为准。
+
+Release 标签和 APK 版本应一致。当前源码为 0.6.6，已发布下载请以对应 Release 为准；预发布包尚需真机验证。覆盖安装需要签名一致，详见 [发布与升级说明](docs/releases.md)。
 
 ## 功能与限制
 
